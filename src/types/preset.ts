@@ -9,6 +9,9 @@ export interface GradientParams {
   uniform_palette_colors_hex: string[];
   uniform_motion_speed: number;
   uniform_flow_rotation_radians: number;
+  /** Drift speed in X and Y (pattern movement). */
+  uniform_flow_drift_speed_x: number;
+  uniform_flow_drift_speed_y: number;
 
   uniform_warp_strength: number;
   uniform_warp_scale: number;

@@ -24,6 +24,8 @@ export interface FlowUniformLocations {
   uniform_seed: WebGLUniformLocation | null;
   uniform_motion_speed: WebGLUniformLocation | null;
   uniform_flow_rotation_cs: WebGLUniformLocation | null;
+  uniform_flow_drift_speed_x: WebGLUniformLocation | null;
+  uniform_flow_drift_speed_y: WebGLUniformLocation | null;
   uniform_warp_strength: WebGLUniformLocation | null;
   uniform_warp_scale: WebGLUniformLocation | null;
   uniform_turbulence: WebGLUniformLocation | null;
@@ -36,6 +38,8 @@ const FLOW_UNIFORM_NAMES: (keyof FlowUniformLocations)[] = [
   "uniform_seed",
   "uniform_motion_speed",
   "uniform_flow_rotation_cs",
+  "uniform_flow_drift_speed_x",
+  "uniform_flow_drift_speed_y",
   "uniform_warp_strength",
   "uniform_warp_scale",
   "uniform_turbulence",
@@ -74,6 +78,8 @@ export function setFlowUniforms(
       ];
     gl.uniform2f(loc.uniform_flow_rotation_cs, cr, sr);
   }
+  if (loc.uniform_flow_drift_speed_x) gl.uniform1f(loc.uniform_flow_drift_speed_x, params.uniform_flow_drift_speed_x);
+  if (loc.uniform_flow_drift_speed_y) gl.uniform1f(loc.uniform_flow_drift_speed_y, params.uniform_flow_drift_speed_y);
   if (loc.uniform_warp_strength) gl.uniform1f(loc.uniform_warp_strength, params.uniform_warp_strength);
   if (loc.uniform_warp_scale) gl.uniform1f(loc.uniform_warp_scale, params.uniform_warp_scale);
   if (loc.uniform_turbulence) gl.uniform1f(loc.uniform_turbulence, params.uniform_turbulence);

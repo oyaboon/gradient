@@ -32,6 +32,8 @@ export function PresetGallery() {
       uniform_palette_colors_hex: colors,
       uniform_motion_speed: randomInRange(0.2, 1.5),
       uniform_flow_rotation_radians: randomInRange(0, Math.PI * 2),
+      uniform_flow_drift_speed_x: (Math.random() * 2 - 1) * 0.2,
+      uniform_flow_drift_speed_y: (Math.random() * 2 - 1) * 0.2,
       uniform_warp_strength: randomInRange(0.2, 1.0),
       uniform_warp_scale: randomInRange(0.5, 4),
       uniform_turbulence: randomInRange(0.1, 0.7),

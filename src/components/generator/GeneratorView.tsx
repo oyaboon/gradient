@@ -153,6 +153,8 @@ export function GeneratorView() {
             uniform_palette_colors_hex: preset.uniform_palette_colors_hex,
             uniform_motion_speed: preset.uniform_motion_speed,
             uniform_flow_rotation_radians: preset.uniform_flow_rotation_radians,
+            uniform_flow_drift_speed_x: preset.uniform_flow_drift_speed_x ?? 0,
+            uniform_flow_drift_speed_y: preset.uniform_flow_drift_speed_y ?? 0,
             uniform_warp_strength: preset.uniform_warp_strength,
             uniform_warp_scale: preset.uniform_warp_scale,
             uniform_turbulence: preset.uniform_turbulence,

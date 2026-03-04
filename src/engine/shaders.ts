@@ -29,6 +29,8 @@ uniform float uniform_display_aspect;
 uniform float uniform_seed;
 uniform float uniform_motion_speed;
 uniform vec2 uniform_flow_rotation_cs;
+uniform float uniform_flow_drift_speed_x;
+uniform float uniform_flow_drift_speed_y;
 uniform float uniform_warp_strength;
 uniform float uniform_warp_scale;
 uniform float uniform_turbulence;
@@ -85,6 +87,8 @@ void main() {
 
   vec2 ndc = v_uv * 2.0 - 1.0;
   ndc.x *= uniform_display_aspect;
+  // Drift in screen space (X = left/right, Y = up/down), independent of rotation
+  ndc -= vec2(uniform_flow_drift_speed_x, uniform_flow_drift_speed_y) * time;
 
   vec2 rotated = vec2(
     ndc.x * uniform_flow_rotation_cs.x - ndc.y * uniform_flow_rotation_cs.y,

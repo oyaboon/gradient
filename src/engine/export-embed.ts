@@ -109,6 +109,8 @@ export function generateEmbedCode(
     u_seed: gl.getUniformLocation(flowProg, 'uniform_seed'),
     u_motion_speed: gl.getUniformLocation(flowProg, 'uniform_motion_speed'),
     u_flow_cs: gl.getUniformLocation(flowProg, 'uniform_flow_rotation_cs'),
+    u_drift_x: gl.getUniformLocation(flowProg, 'uniform_flow_drift_speed_x'),
+    u_drift_y: gl.getUniformLocation(flowProg, 'uniform_flow_drift_speed_y'),
     u_warp_str: gl.getUniformLocation(flowProg, 'uniform_warp_strength'),
     u_warp_scale: gl.getUniformLocation(flowProg, 'uniform_warp_scale'),
     u_turbulence: gl.getUniformLocation(flowProg, 'uniform_turbulence'),
@@ -175,6 +177,8 @@ export function generateEmbedCode(
       gl.uniform1f(flowLoc.u_seed, params.uniform_seed);
       gl.uniform1f(flowLoc.u_motion_speed, params.uniform_motion_speed);
       gl.uniform2f(flowLoc.u_flow_cs, Math.cos(rad), Math.sin(rad));
+      if (flowLoc.u_drift_x != null) gl.uniform1f(flowLoc.u_drift_x, params.uniform_flow_drift_speed_x ?? 0);
+      if (flowLoc.u_drift_y != null) gl.uniform1f(flowLoc.u_drift_y, params.uniform_flow_drift_speed_y ?? 0);
       gl.uniform1f(flowLoc.u_warp_str, params.uniform_warp_strength);
       gl.uniform1f(flowLoc.u_warp_scale, params.uniform_warp_scale);
       gl.uniform1f(flowLoc.u_turbulence, params.uniform_turbulence);

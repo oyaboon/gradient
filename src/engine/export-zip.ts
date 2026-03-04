@@ -18,6 +18,8 @@ function generateGradientJsContent(): string {
     uniform_palette_colors_hex: preset.uniform_palette_colors_hex,
     uniform_motion_speed: preset.uniform_motion_speed,
     uniform_flow_rotation_radians: preset.uniform_flow_rotation_radians,
+    uniform_flow_drift_speed_x: preset.uniform_flow_drift_speed_x,
+    uniform_flow_drift_speed_y: preset.uniform_flow_drift_speed_y,
     uniform_warp_strength: preset.uniform_warp_strength,
     uniform_warp_scale: preset.uniform_warp_scale,
     uniform_turbulence: preset.uniform_turbulence,
@@ -76,7 +78,7 @@ function generateGradientJsContent(): string {
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   gl.bindTexture(gl.TEXTURE_2D, null);
 
-  var flowLoc = { u_time: gl.getUniformLocation(flowProg, 'uniform_time_seconds'), u_aspect: gl.getUniformLocation(flowProg, 'uniform_display_aspect'), u_seed: gl.getUniformLocation(flowProg, 'uniform_seed'), u_motion_speed: gl.getUniformLocation(flowProg, 'uniform_motion_speed'), u_flow_cs: gl.getUniformLocation(flowProg, 'uniform_flow_rotation_cs'), u_warp_str: gl.getUniformLocation(flowProg, 'uniform_warp_strength'), u_warp_scale: gl.getUniformLocation(flowProg, 'uniform_warp_scale'), u_turbulence: gl.getUniformLocation(flowProg, 'uniform_turbulence'), u_reduce_motion: gl.getUniformLocation(flowProg, 'uniform_reduce_motion_enabled') };
+  var flowLoc = { u_time: gl.getUniformLocation(flowProg, 'uniform_time_seconds'), u_aspect: gl.getUniformLocation(flowProg, 'uniform_display_aspect'), u_seed: gl.getUniformLocation(flowProg, 'uniform_seed'), u_motion_speed: gl.getUniformLocation(flowProg, 'uniform_motion_speed'), u_flow_cs: gl.getUniformLocation(flowProg, 'uniform_flow_rotation_cs'), u_drift_x: gl.getUniformLocation(flowProg, 'uniform_flow_drift_speed_x'), u_drift_y: gl.getUniformLocation(flowProg, 'uniform_flow_drift_speed_y'), u_warp_str: gl.getUniformLocation(flowProg, 'uniform_warp_strength'), u_warp_scale: gl.getUniformLocation(flowProg, 'uniform_warp_scale'), u_turbulence: gl.getUniformLocation(flowProg, 'uniform_turbulence'), u_reduce_motion: gl.getUniformLocation(flowProg, 'uniform_reduce_motion_enabled') };
   var compLoc = { u_flow_map: gl.getUniformLocation(compositeProg, 'uniform_flow_map'), u_res: gl.getUniformLocation(compositeProg, 'uniform_canvas_resolution_pixels'), u_dpr: gl.getUniformLocation(compositeProg, 'uniform_device_pixel_ratio'), u_seed: gl.getUniformLocation(compositeProg, 'uniform_seed'), u_palette_count: gl.getUniformLocation(compositeProg, 'uniform_palette_color_count'), u_palette: gl.getUniformLocation(compositeProg, 'uniform_palette_colors_rgb'), u_brightness: gl.getUniformLocation(compositeProg, 'uniform_brightness'), u_contrast: gl.getUniformLocation(compositeProg, 'uniform_contrast'), u_saturation: gl.getUniformLocation(compositeProg, 'uniform_saturation'), u_grain_amt: gl.getUniformLocation(compositeProg, 'uniform_grain_amount'), u_grain_size: gl.getUniformLocation(compositeProg, 'uniform_grain_size') };
 
   var startTime = (typeof performance !== 'undefined' ? performance.now() : 0) / 1000;
@@ -106,6 +108,8 @@ function generateGradientJsContent(): string {
     gl.uniform1f(flowLoc.u_seed, params.uniform_seed);
     gl.uniform1f(flowLoc.u_motion_speed, params.uniform_motion_speed);
     gl.uniform2f(flowLoc.u_flow_cs, Math.cos(rad), Math.sin(rad));
+    if (flowLoc.u_drift_x) gl.uniform1f(flowLoc.u_drift_x, params.uniform_flow_drift_speed_x ?? 0);
+    if (flowLoc.u_drift_y) gl.uniform1f(flowLoc.u_drift_y, params.uniform_flow_drift_speed_y ?? 0);
     gl.uniform1f(flowLoc.u_warp_str, params.uniform_warp_strength);
     gl.uniform1f(flowLoc.u_warp_scale, params.uniform_warp_scale);
     gl.uniform1f(flowLoc.u_turbulence, params.uniform_turbulence);
