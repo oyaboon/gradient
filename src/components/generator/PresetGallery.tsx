@@ -4,6 +4,7 @@ import { useCallback } from "react";
 import { useGradientStore } from "@/store/useGradientStore";
 import { getAllPresets } from "@/presets";
 import type { Preset } from "@/types/preset";
+import { usePresetThumbnails } from "@/hooks/usePresetThumbnails";
 
 function randomInRange(min: number, max: number): number {
   return min + Math.random() * (max - min);
@@ -11,6 +12,7 @@ function randomInRange(min: number, max: number): number {
 
 export function PresetGallery() {
   const presets = getAllPresets();
+  const thumbnails = usePresetThumbnails(presets);
   const activePreset = useGradientStore((s) => s.activePreset);
   const applyPreset = useGradientStore((s) => s.applyPreset);
   const setParamsPartial = useGradientStore((s) => s.setParamsPartial);
@@ -67,12 +69,22 @@ export function PresetGallery() {
                 ${isActive ? "border-white/60 ring-1 ring-white/40" : "border-white/20 hover:border-white/40"}
               `}
             >
-              <div
-                className="aspect-video w-full shrink-0"
-                style={{
-                  background: `linear-gradient(135deg, ${preset.uniform_palette_colors_hex.slice(0, 3).join(", ")})`,
-                }}
-              />
+              <div className="aspect-video w-full shrink-0 bg-neutral-900 overflow-hidden">
+                {thumbnails[preset.preset_name] ? (
+                  <img
+                    src={thumbnails[preset.preset_name]}
+                    alt=""
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div
+                    className="w-full h-full"
+                    style={{
+                      background: `linear-gradient(135deg, ${preset.uniform_palette_colors_hex.slice(0, 3).join(", ")})`,
+                    }}
+                  />
+                )}
+              </div>
               <span className="p-1.5 text-xs text-white/80 truncate text-center">
                 {preset.preset_name}
               </span>
