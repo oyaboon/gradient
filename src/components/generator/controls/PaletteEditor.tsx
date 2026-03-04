@@ -36,30 +36,46 @@ export function PaletteEditor({ colors, onChange }: PaletteEditorProps) {
     onChange({ uniform_palette_colors_hex: next });
   }, [colors, onChange]);
 
+  const randomHex = useCallback(() => {
+    const n = Math.floor(Math.random() * 0xffffff);
+    return "#" + n.toString(16).padStart(6, "0");
+  }, []);
+
+  const randomize = useCallback(() => {
+    const count = MIN_COLORS + Math.floor(Math.random() * (MAX_COLORS - MIN_COLORS + 1));
+    const next = Array.from({ length: count }, () => randomHex());
+    onChange({ uniform_palette_colors_hex: next });
+  }, [onChange, randomHex]);
+
   const list = colors.length >= MIN_COLORS ? colors : ["#0B1020", "#2A6BFF", "#00FFD1"];
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-white">Palette</span>
-        <div className="flex gap-1">
-          <button
-            type="button"
-            onClick={remove}
-            disabled={list.length <= MIN_COLORS}
-            className="px-2 py-1 text-xs rounded bg-white/10 text-white/80 disabled:opacity-50 hover:bg-white/20"
-          >
-            −
-          </button>
-          <button
-            type="button"
-            onClick={add}
-            disabled={list.length >= MAX_COLORS}
-            className="px-2 py-1 text-xs rounded bg-white/10 text-white/80 disabled:opacity-50 hover:bg-white/20"
-          >
-            +
-          </button>
-        </div>
+      <div className="flex items-center justify-end gap-1">
+        <button
+          type="button"
+          onClick={remove}
+          disabled={list.length <= MIN_COLORS}
+          className="px-2 py-1 text-xs rounded bg-white/10 text-white/80 disabled:opacity-50 hover:bg-white/20"
+        >
+          −
+        </button>
+        <button
+          type="button"
+          onClick={add}
+          disabled={list.length >= MAX_COLORS}
+          className="px-2 py-1 text-xs rounded bg-white/10 text-white/80 disabled:opacity-50 hover:bg-white/20"
+        >
+          +
+        </button>
+        <button
+          type="button"
+          onClick={randomize}
+          title="Randomize palette"
+          className="px-2 py-1 text-xs rounded bg-white/10 text-white/80 hover:bg-white/20"
+        >
+          Randomize
+        </button>
       </div>
       <div className="grid grid-cols-1 gap-2">
         {list.map((hex, i) => (
