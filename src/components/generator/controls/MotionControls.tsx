@@ -12,25 +12,6 @@ interface MotionControlsProps {
   onChange: (partial: Partial<GradientParams>) => void;
 }
 
-function RefreshIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
-      <path d="M21 3v5h-5" />
-    </svg>
-  );
-}
-
 export function MotionControls({ params, onChange }: MotionControlsProps) {
   const [seedInput, setSeedInput] = useState<string>(() =>
     String(params.uniform_seed)
@@ -52,34 +33,54 @@ export function MotionControls({ params, onChange }: MotionControlsProps) {
     [onChange, params.uniform_seed]
   );
 
-  const handleRandomize = () => {
+  const handleRandomizeSeed = () => {
     const value = Math.random() * 400;
     onChange({ uniform_seed: value });
     setSeedInput(String(value));
   };
 
+  const handleRandomizeMotion = () => {
+    const speed = 0.2 + Math.random() * 1.3;
+    const rotation = Math.random() * Math.PI * 2;
+    onChange({
+      uniform_motion_speed: speed,
+      uniform_flow_rotation_radians: rotation,
+    });
+  };
+
   return (
     <div className="space-y-4">
-      <span className="text-xs text-white/70 block">Seed</span>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs text-white">Seed</span>
         <button
           type="button"
-          onClick={handleRandomize}
+          onClick={handleRandomizeSeed}
           title="Randomize seed"
-          className="w-8 h-8 shrink-0 flex items-center justify-center rounded border border-white/20 bg-white/10 text-white/80 hover:bg-white/20"
+          className="px-2 py-1 text-xs rounded bg-white/10 text-white/80 hover:bg-white/20"
         >
-          <RefreshIcon />
+          Randomize
         </button>
-        <input
-          type="text"
-          value={seedInput}
-          onChange={(e) => setSeedInput(e.target.value)}
-          onBlur={() => commitSeed(seedInput)}
-          onKeyDown={(e) => e.key === "Enter" && commitSeed(seedInput)}
-          className="flex-1 min-w-0 px-2 py-1 rounded bg-white/10 border border-white/20 text-white text-sm font-mono"
-        />
       </div>
+      <input
+        type="text"
+        value={seedInput}
+        onChange={(e) => setSeedInput(e.target.value)}
+        onBlur={() => commitSeed(seedInput)}
+        onKeyDown={(e) => e.key === "Enter" && commitSeed(seedInput)}
+        className="w-full min-w-0 px-2 py-1 rounded bg-white/10 border border-white/20 text-white text-sm font-mono"
+      />
       <div className="mt-4 pt-4 border-t border-white/10 space-y-4">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs text-white">Motion</span>
+          <button
+            type="button"
+            onClick={handleRandomizeMotion}
+            title="Randomize speed and rotation"
+            className="px-2 py-1 text-xs rounded bg-white/10 text-white/80 hover:bg-white/20"
+          >
+            Randomize
+          </button>
+        </div>
       <Slider
         label="Speed"
         value={params.uniform_motion_speed}
@@ -91,7 +92,7 @@ export function MotionControls({ params, onChange }: MotionControlsProps) {
         valueFormat={(v) => v.toFixed(2)}
       />
       <Slider
-        label="Rotation (°)"
+        label="Rotation"
         value={(params.uniform_flow_rotation_radians * 180) / Math.PI}
         min={0}
         max={360}

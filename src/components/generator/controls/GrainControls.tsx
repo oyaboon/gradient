@@ -11,9 +11,31 @@ interface GrainControlsProps {
   onChange: (partial: Partial<GradientParams>) => void;
 }
 
+function randomInRange(min: number, max: number) {
+  return min + Math.random() * (max - min);
+}
+
 export function GrainControls({ params, onChange }: GrainControlsProps) {
+  const handleRandomizeGrain = () => {
+    onChange({
+      uniform_grain_amount: randomInRange(0.05, 0.25),
+      uniform_grain_size: randomInRange(0.8, 1.6),
+    });
+  };
+
   return (
     <div className="space-y-4">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs text-white">Grain</span>
+        <button
+          type="button"
+          onClick={handleRandomizeGrain}
+          title="Randomize grain"
+          className="px-2 py-1 text-xs rounded bg-white/10 text-white/80 hover:bg-white/20"
+        >
+          Randomize
+        </button>
+      </div>
       <Slider
         label="Grain amount"
         value={params.uniform_grain_amount}

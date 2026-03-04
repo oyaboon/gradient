@@ -11,9 +11,32 @@ interface WarpControlsProps {
   onChange: (partial: Partial<GradientParams>) => void;
 }
 
+function randomInRange(min: number, max: number) {
+  return min + Math.random() * (max - min);
+}
+
 export function WarpControls({ params, onChange }: WarpControlsProps) {
+  const handleRandomizeWarp = () => {
+    onChange({
+      uniform_warp_strength: randomInRange(0.2, 1.0),
+      uniform_warp_scale: randomInRange(0.5, 4),
+      uniform_turbulence: randomInRange(0.1, 0.7),
+    });
+  };
+
   return (
     <div className="space-y-4">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs text-white">Warp</span>
+        <button
+          type="button"
+          onClick={handleRandomizeWarp}
+          title="Randomize warp"
+          className="px-2 py-1 text-xs rounded bg-white/10 text-white/80 hover:bg-white/20"
+        >
+          Randomize
+        </button>
+      </div>
       <Slider
         label="Warp strength"
         value={params.uniform_warp_strength}
