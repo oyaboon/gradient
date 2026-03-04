@@ -21,6 +21,8 @@ export function PostControls({ params, onChange }: PostControlsProps) {
         max={2}
         step={0.05}
         onChange={(v) => onChange({ uniform_brightness: v })}
+        showValue
+        valueFormat={(v) => v.toFixed(2)}
       />
       <Slider
         label="Contrast"
@@ -29,6 +31,8 @@ export function PostControls({ params, onChange }: PostControlsProps) {
         max={2}
         step={0.05}
         onChange={(v) => onChange({ uniform_contrast: v })}
+        showValue
+        valueFormat={(v) => v.toFixed(2)}
       />
       <Slider
         label="Saturation"
@@ -37,6 +41,8 @@ export function PostControls({ params, onChange }: PostControlsProps) {
         max={2}
         step={0.05}
         onChange={(v) => onChange({ uniform_saturation: v })}
+        showValue
+        valueFormat={(v) => v.toFixed(2)}
       />
     </div>
   );

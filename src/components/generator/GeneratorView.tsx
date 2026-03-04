@@ -27,11 +27,15 @@ export function GeneratorView() {
   const applyPreset = useGradientStore((s) => s.applyPreset);
   const qualityResolutionScale = useGradientStore((s) => s.qualityResolutionScale);
   const qualityFpsCap = useGradientStore((s) => s.qualityFpsCap);
+  const qualityFlowMapSize = useGradientStore((s) => s.qualityFlowMapSize);
+  const qualityFlowFps = useGradientStore((s) => s.qualityFlowFps);
   const fallbackDataUrl = useGradientStore((s) => s.fallbackDataUrl);
   const setFallbackDataUrl = useGradientStore((s) => s.setFallbackDataUrl);
   const setMode = useGradientStore((s) => s.setMode);
   const setQualityResolutionScale = useGradientStore((s) => s.setQualityResolutionScale);
   const setQualityFpsCap = useGradientStore((s) => s.setQualityFpsCap);
+  const setQualityFlowMapSize = useGradientStore((s) => s.setQualityFlowMapSize);
+  const setQualityFlowFps = useGradientStore((s) => s.setQualityFlowFps);
 
   const rendererRef = useRef<GradientRenderer | null>(null);
   const [copyEmbedLoading, setCopyEmbedLoading] = useState(false);
@@ -45,6 +49,8 @@ export function GeneratorView() {
       ...params,
       quality_resolution_scale: qualityResolutionScale,
       quality_fps_cap: qualityFpsCap,
+      quality_flow_map_size: qualityFlowMapSize,
+      quality_flow_fps: qualityFlowFps,
       export_fallback_image_data_url: fallbackDataUrl ?? undefined,
     };
   }, [
@@ -52,6 +58,8 @@ export function GeneratorView() {
     params,
     qualityResolutionScale,
     qualityFpsCap,
+    qualityFlowMapSize,
+    qualityFlowFps,
     fallbackDataUrl,
   ]);
 
@@ -155,9 +163,13 @@ export function GeneratorView() {
             uniform_reduce_motion_enabled: (preset.uniform_reduce_motion_enabled ?? 0) as 0 | 1,
             quality_resolution_scale: preset.quality_resolution_scale ?? 0.75,
             quality_fps_cap: (preset.quality_fps_cap ?? 60) as 30 | 60,
+            quality_flow_map_size: preset.quality_flow_map_size,
+            quality_flow_fps: preset.quality_flow_fps,
           });
           setQualityResolutionScale(preset.quality_resolution_scale ?? 0.75);
           setQualityFpsCap((preset.quality_fps_cap ?? 60) as 30 | 60);
+          if (preset.quality_flow_map_size != null) setQualityFlowMapSize(preset.quality_flow_map_size);
+          if (preset.quality_flow_fps != null) setQualityFlowFps(preset.quality_flow_fps);
           showToast("Preset imported");
         } catch {
           showToast("Invalid preset JSON");
@@ -165,7 +177,7 @@ export function GeneratorView() {
       };
       reader.readAsText(file);
     },
-    [applyPreset, setQualityResolutionScale, setQualityFpsCap, showToast]
+    [applyPreset, setQualityResolutionScale, setQualityFpsCap, setQualityFlowMapSize, setQualityFlowFps, showToast]
   );
 
   return (
@@ -176,6 +188,8 @@ export function GeneratorView() {
           config={{
             resolutionScale: qualityResolutionScale,
             fpsCap: qualityFpsCap,
+            flowMapSize: qualityFlowMapSize,
+            flowFps: qualityFlowFps,
           }}
           rendererRef={rendererRef}
           onFallbackCapture={setFallbackDataUrl}

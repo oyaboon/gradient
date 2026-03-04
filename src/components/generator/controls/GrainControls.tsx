@@ -18,17 +18,21 @@ export function GrainControls({ params, onChange }: GrainControlsProps) {
         label="Grain amount"
         value={params.uniform_grain_amount}
         min={0}
-        max={1}
-        step={0.05}
+        max={0.25}
+        step={0.01}
         onChange={(v) => onChange({ uniform_grain_amount: v })}
+        showValue
+        valueFormat={(v) => v.toFixed(2)}
       />
       <Slider
         label="Grain size"
         value={params.uniform_grain_size}
         min={0.5}
-        max={3}
+        max={1.6}
         step={0.1}
         onChange={(v) => onChange({ uniform_grain_size: v })}
+        showValue
+        valueFormat={(v) => v.toFixed(1)}
       />
     </div>
   );

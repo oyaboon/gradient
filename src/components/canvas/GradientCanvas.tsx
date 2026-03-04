@@ -108,6 +108,16 @@ export function GradientCanvas({
     }
   }, [config?.resolutionScale, config?.fpsCap, getParams, onReady, onError, onFallbackCapture]);
 
+  useEffect(() => {
+    const r = rendererRef.current;
+    if (r && config && (config.flowMapSize != null || config.flowFps != null)) {
+      r.setConfig({
+        flowMapSize: config.flowMapSize,
+        flowFps: config.flowFps,
+      });
+    }
+  }, [config?.flowMapSize, config?.flowFps]);
+
   return (
     <div ref={containerRef} className={`relative w-full h-full overflow-hidden ${className}`}>
       <FallbackImage visible={!glReady} src={fallbackSrc} />

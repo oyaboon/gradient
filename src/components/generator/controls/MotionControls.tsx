@@ -14,6 +14,16 @@ interface MotionControlsProps {
 export function MotionControls({ params, onChange }: MotionControlsProps) {
   return (
     <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => onChange({ uniform_seed: Math.random() * 400 })}
+          className="px-3 py-1.5 rounded text-sm bg-white/10 text-white/80 hover:bg-white/20"
+          title="Новый случайный паттерн"
+        >
+          Randomize
+        </button>
+      </div>
       <Slider
         label="Speed"
         value={params.uniform_motion_speed}
@@ -21,6 +31,8 @@ export function MotionControls({ params, onChange }: MotionControlsProps) {
         max={2}
         step={0.05}
         onChange={(v) => onChange({ uniform_motion_speed: v })}
+        showValue
+        valueFormat={(v) => v.toFixed(2)}
       />
       <Slider
         label="Rotation (°)"
@@ -31,6 +43,8 @@ export function MotionControls({ params, onChange }: MotionControlsProps) {
         onChange={(v) =>
           onChange({ uniform_flow_rotation_radians: (v * Math.PI) / 180 })
         }
+        showValue
+        valueFormat={(v) => Math.round(v).toString()}
       />
     </div>
   );

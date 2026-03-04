@@ -29,6 +29,8 @@ export interface GradientState {
   licenseValid: boolean;
   qualityResolutionScale: number;
   qualityFpsCap: 30 | 60;
+  qualityFlowMapSize: number;
+  qualityFlowFps: number;
   fallbackDataUrl: string | null;
 
   setParams: (params: GradientParams) => void;
@@ -40,6 +42,8 @@ export interface GradientState {
   enterGenerator: () => void;
   setQualityResolutionScale: (v: number) => void;
   setQualityFpsCap: (v: 30 | 60) => void;
+  setQualityFlowMapSize: (v: number) => void;
+  setQualityFlowFps: (v: number) => void;
   setFallbackDataUrl: (v: string | null) => void;
 }
 
@@ -52,6 +56,8 @@ export const useGradientStore = create<GradientState>()(
       licenseValid: false,
       qualityResolutionScale: 0.75,
       qualityFpsCap: 60,
+      qualityFlowMapSize: 384,
+      qualityFlowFps: 30,
       fallbackDataUrl: null,
 
       setParams: (params) => set({ params }),
@@ -80,6 +86,8 @@ export const useGradientStore = create<GradientState>()(
           activePreset: preset,
           qualityResolutionScale: preset.quality_resolution_scale,
           qualityFpsCap: preset.quality_fps_cap,
+          qualityFlowMapSize: preset.quality_flow_map_size ?? 384,
+          qualityFlowFps: preset.quality_flow_fps ?? 30,
         }),
 
       setMode: (mode) => set({ mode }),
@@ -91,6 +99,8 @@ export const useGradientStore = create<GradientState>()(
       setQualityResolutionScale: (qualityResolutionScale) =>
         set({ qualityResolutionScale }),
       setQualityFpsCap: (qualityFpsCap) => set({ qualityFpsCap }),
+      setQualityFlowMapSize: (qualityFlowMapSize) => set({ qualityFlowMapSize }),
+      setQualityFlowFps: (qualityFlowFps) => set({ qualityFlowFps }),
       setFallbackDataUrl: (fallbackDataUrl) => set({ fallbackDataUrl }),
     }),
     {

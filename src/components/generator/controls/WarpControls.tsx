@@ -21,6 +21,8 @@ export function WarpControls({ params, onChange }: WarpControlsProps) {
         max={1.2}
         step={0.05}
         onChange={(v) => onChange({ uniform_warp_strength: v })}
+        showValue
+        valueFormat={(v) => v.toFixed(2)}
       />
       <Slider
         label="Warp scale"
@@ -29,6 +31,8 @@ export function WarpControls({ params, onChange }: WarpControlsProps) {
         max={6}
         step={0.1}
         onChange={(v) => onChange({ uniform_warp_scale: v })}
+        showValue
+        valueFormat={(v) => v.toFixed(1)}
       />
       <Slider
         label="Turbulence"
@@ -37,6 +41,8 @@ export function WarpControls({ params, onChange }: WarpControlsProps) {
         max={1}
         step={0.05}
         onChange={(v) => onChange({ uniform_turbulence: v })}
+        showValue
+        valueFormat={(v) => v.toFixed(2)}
       />
     </div>
   );

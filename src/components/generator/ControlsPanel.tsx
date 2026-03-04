@@ -14,36 +14,47 @@ const SECTIONS = [
   { id: "motion", label: "Motion", Component: MotionControls },
   { id: "warp", label: "Warp", Component: WarpControls },
   { id: "post", label: "Post", Component: PostControls },
-  { id: "grain", label: "Grain", Component: GrainControls },
   { id: "quality", label: "Quality", Component: QualityControls },
 ] as const;
 
 export function ControlsPanel() {
-  const [openId, setOpenId] = useState<string | null>("palette");
+  const [openIds, setOpenIds] = useState<Set<string>>(new Set(["palette"]));
+  const toggleSection = (id: string) => {
+    setOpenIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
   const params = useGradientStore((s) => s.params);
   const setParamsPartial = useGradientStore((s) => s.setParamsPartial);
   const qualityResolutionScale = useGradientStore((s) => s.qualityResolutionScale);
   const qualityFpsCap = useGradientStore((s) => s.qualityFpsCap);
   const setQualityResolutionScale = useGradientStore((s) => s.setQualityResolutionScale);
   const setQualityFpsCap = useGradientStore((s) => s.setQualityFpsCap);
+  const qualityFlowMapSize = useGradientStore((s) => s.qualityFlowMapSize);
+  const qualityFlowFps = useGradientStore((s) => s.qualityFlowFps);
+  const setQualityFlowMapSize = useGradientStore((s) => s.setQualityFlowMapSize);
+  const setQualityFlowFps = useGradientStore((s) => s.setQualityFlowFps);
   const reduceMotion = params.uniform_reduce_motion_enabled;
 
   return (
     <div className="flex flex-col gap-1 border border-white/10 rounded-lg overflow-hidden bg-neutral-900/80">
       {SECTIONS.map(({ id, label, Component }) => {
-        const isOpen = openId === id;
+        const isOpen = openIds.has(id);
         return (
           <div key={id} className="border-b border-white/10 last:border-b-0">
             <button
               type="button"
-              onClick={() => setOpenId(isOpen ? null : id)}
+              onClick={() => toggleSection(id)}
               className="w-full px-4 py-3 flex items-center justify-between text-left text-sm font-medium text-white hover:bg-white/5"
             >
               {label}
               <span className="text-white/50">{isOpen ? "−" : "+"}</span>
             </button>
             {isOpen && (
-              <div className="px-4 pb-4 pt-0">
+              <div className="px-4 pt-4 pb-4">
                 {id === "palette" && (
                   <PaletteEditor
                     colors={params.uniform_palette_colors_hex}
@@ -57,10 +68,12 @@ export function ControlsPanel() {
                   <WarpControls params={params} onChange={setParamsPartial} />
                 )}
                 {id === "post" && (
-                  <PostControls params={params} onChange={setParamsPartial} />
-                )}
-                {id === "grain" && (
-                  <GrainControls params={params} onChange={setParamsPartial} />
+                  <>
+                    <PostControls params={params} onChange={setParamsPartial} />
+                    <div className="mt-4 pt-4 border-t border-white/10">
+                      <GrainControls params={params} onChange={setParamsPartial} />
+                    </div>
+                  </>
                 )}
                 {id === "quality" && (
                   <QualityControls
@@ -72,6 +85,10 @@ export function ControlsPanel() {
                     onReduceMotionChange={(v) =>
                       setParamsPartial({ uniform_reduce_motion_enabled: v })
                     }
+                    flowMapSize={qualityFlowMapSize}
+                    flowFps={qualityFlowFps}
+                    onFlowMapSizeChange={setQualityFlowMapSize}
+                    onFlowFpsChange={setQualityFlowFps}
                   />
                 )}
               </div>

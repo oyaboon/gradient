@@ -29,6 +29,10 @@ export interface GradientParams {
 export interface QualityParams {
   quality_resolution_scale: number;
   quality_fps_cap: 30 | 60;
+  /** Flow map texture size (advanced). Default 384. */
+  quality_flow_map_size?: number;
+  /** Flow pass update rate in fps (advanced). Default 30. */
+  quality_flow_fps?: number;
 }
 
 /** Full preset: params + name + optional fallback image for export. */

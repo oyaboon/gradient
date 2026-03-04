@@ -226,7 +226,7 @@ export const PRESETS: Preset[] = [
     uniform_contrast: 1.3,
     uniform_saturation: 0.9,
     uniform_grain_amount: 0.25,
-    uniform_grain_size: 1.8,
+    uniform_grain_size: 1.6,
     uniform_reduce_motion_enabled: 0,
     quality_resolution_scale: 0.75,
     quality_fps_cap: 60,
