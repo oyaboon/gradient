@@ -6,6 +6,7 @@ import { GradientCanvas } from "@/components/canvas/GradientCanvas";
 import { PresetGallery } from "./PresetGallery";
 import { ControlsPanel } from "./ControlsPanel";
 import { ExportPanel } from "./ExportPanel";
+import { ScrollArea } from "@/components/ui/ScrollArea";
 import type { GradientRenderer } from "@/engine/renderer";
 import type { Preset } from "@/types/preset";
 import { generateEmbedCode } from "@/engine/export-embed";
@@ -196,31 +197,36 @@ export function GeneratorView() {
           className="absolute inset-0"
         />
       </div>
-      <aside className="w-full md:w-96 lg:w-[28rem] flex-shrink-0 overflow-y-auto bg-neutral-950/95 border-t md:border-t-0 md:border-l border-white/10 p-4 space-y-6">
-        <div className="flex items-center justify-between">
-          <h2 className="font-display text-lg font-semibold text-white">
-            Generator
-          </h2>
-          <button
-            type="button"
-            onClick={() => setMode("landing")}
-            className="text-xs text-white/60 hover:text-white"
-          >
-            Back to landing
-          </button>
+      <ScrollArea
+        type="scroll"
+        className="w-full md:w-96 lg:w-[28rem] flex-shrink-0 bg-neutral-950/95 border-t md:border-t-0 md:border-l border-white/10 h-screen"
+      >
+        <div className="p-4 space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="font-display text-lg font-semibold text-white">
+              Generator
+            </h2>
+            <button
+              type="button"
+              onClick={() => setMode("landing")}
+              className="text-xs text-white/60 hover:text-white"
+            >
+              Back to landing
+            </button>
+          </div>
+          <PresetGallery />
+          <ControlsPanel />
+          <ExportPanel
+            onCopyEmbed={handleCopyEmbed}
+            onDownloadZip={handleDownloadZip}
+            onDownloadWallpaperEngine={handleDownloadWallpaperEngine}
+            onDownloadPng={handleDownloadPng}
+            onExportPresetJson={handleExportPresetJson}
+            onImportPresetJson={handleImportPresetJson}
+            copyEmbedLoading={copyEmbedLoading}
+          />
         </div>
-        <PresetGallery />
-        <ControlsPanel />
-        <ExportPanel
-          onCopyEmbed={handleCopyEmbed}
-          onDownloadZip={handleDownloadZip}
-          onDownloadWallpaperEngine={handleDownloadWallpaperEngine}
-          onDownloadPng={handleDownloadPng}
-          onExportPresetJson={handleExportPresetJson}
-          onImportPresetJson={handleImportPresetJson}
-          copyEmbedLoading={copyEmbedLoading}
-        />
-      </aside>
+      </ScrollArea>
     </div>
   );
 }

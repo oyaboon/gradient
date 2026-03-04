@@ -5,6 +5,7 @@ import { useGradientStore } from "@/store/useGradientStore";
 import { getAllPresets } from "@/presets";
 import type { Preset } from "@/types/preset";
 import { usePresetThumbnails } from "@/hooks/usePresetThumbnails";
+import { ScrollArea } from "@/components/ui/ScrollArea";
 
 function randomInRange(min: number, max: number): number {
   return min + Math.random() * (max - min);
@@ -55,8 +56,9 @@ export function PresetGallery() {
           Randomize
         </button>
       </div>
-      <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-48 overflow-y-auto">
-        {presets.map((preset) => {
+      <ScrollArea className="h-48" type="scroll">
+        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 pr-2">
+          {presets.map((preset) => {
           const isActive =
             activePreset?.preset_name === preset.preset_name;
           return (
@@ -91,7 +93,8 @@ export function PresetGallery() {
             </button>
           );
         })}
-      </div>
+        </div>
+      </ScrollArea>
     </div>
   );
 }

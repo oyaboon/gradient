@@ -11,3 +11,21 @@ body {
   background-color: var(--color-background);
   color: var(--color-foreground);
 }
+
+@keyframes scrollbarFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scrollbarFadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+.radix-scrollbar[data-state="visible"] {
+  animation: scrollbarFadeIn 100ms ease-out forwards;
+}
+
+.radix-scrollbar[data-state="hidden"] {
+  animation: scrollbarFadeOut 200ms ease-out forwards;
+}
