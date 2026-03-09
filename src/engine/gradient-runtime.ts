@@ -111,6 +111,8 @@ export function mountGradient(
   let intersectionObserver: IntersectionObserver | null = null;
   let destroyed = false;
   let hoverListenersAttached = false;
+  /** In hover mode, freeze animation time when not hovered so resume has no jump. */
+  let lastAnimationTimeSeconds = 0;
 
   const applyRendererConfig = () => {
     const { width, height } = readTargetSize(target);
@@ -162,10 +164,15 @@ export function mountGradient(
     const effectiveMode = getEffectiveMode(target, options);
     const animate = shouldAnimate(effectiveMode, state, options);
 
+    if (!animate && effectiveMode === "hover") {
+      lastAnimationTimeSeconds = renderer.getCurrentTime();
+    }
     renderer.stop();
 
     if (animate) {
-      renderer.start(() => preset.params);
+      renderer.start(() => preset.params, {
+        timeOffsetSeconds: effectiveMode === "hover" ? lastAnimationTimeSeconds : undefined,
+      });
       return;
     }
 

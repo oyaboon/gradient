@@ -349,9 +349,21 @@ export class GradientRenderer {
     this.draw(params, { forceFlowUpdate: true });
   }
 
-  startLoop(params: () => GradientParams): void {
+  /** Seconds used for the last flow pass. Used so hover/pause can resume without a time jump. */
+  getCurrentTime(): number {
+    const nowMs = typeof performance !== "undefined" ? performance.now() : 0;
+    return nowMs / 1000 - this.startTime;
+  }
+
+  startLoop(
+    params: () => GradientParams,
+    options?: { timeOffsetSeconds?: number }
+  ): void {
+    const nowSec = (typeof performance !== "undefined" ? performance.now() : 0) / 1000;
     this.startTime =
-      (typeof performance !== "undefined" ? performance.now() : 0) / 1000;
+      options?.timeOffsetSeconds != null
+        ? nowSec - options.timeOffsetSeconds
+        : nowSec;
 
     const tick = (now: number) => {
       if (this.destroyed) return;
@@ -369,8 +381,8 @@ export class GradientRenderer {
     this.rafId = requestAnimationFrame(tick);
   }
 
-  start(params: () => GradientParams): void {
-    this.startLoop(params);
+  start(params: () => GradientParams, options?: { timeOffsetSeconds?: number }): void {
+    this.startLoop(params, options);
   }
 
   stopLoop(): void {

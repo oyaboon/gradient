@@ -247,7 +247,10 @@ export function generateRuntimeJavascript(): string {
       isPaused: false,
       lastFlowTimeMs: -Infinity,
       lastFrameTimeMs: 0,
-      rafId: null
+      rafId: null,
+      lastUsedShaderTimeSeconds: 0,
+      animationStartRealMs: 0,
+      animationStartShaderTimeSeconds: 0
     };
 
     var reducedMotionQuery =
@@ -295,13 +298,16 @@ export function generateRuntimeJavascript(): string {
     }
 
     function drawFrame(nowMs, forceFlowUpdate) {
-      var time = nowMs / 1000;
+      var time = state.animationStartRealMs
+        ? state.animationStartShaderTimeSeconds + (nowMs - state.animationStartRealMs) / 1000
+        : nowMs / 1000;
       var aspect = state.displayWidth / Math.max(state.displayHeight, 1);
       var flowDue =
         forceFlowUpdate ||
         (nowMs - state.lastFlowTimeMs) >= (1000 / options.flowFps);
 
       if (flowDue) {
+        state.lastUsedShaderTimeSeconds = time;
         var rad = params.uniform_flow_rotation_radians;
         gl.bindFramebuffer(gl.FRAMEBUFFER, flowFramebuffer);
         gl.viewport(0, 0, flowMapSize, flowMapSize);
@@ -373,11 +379,15 @@ export function generateRuntimeJavascript(): string {
     function syncLoopState() {
       stopLoop();
       if (canAnimate()) {
+        state.animationStartRealMs = typeof performance !== "undefined" ? performance.now() : 0;
+        state.animationStartShaderTimeSeconds = state.lastUsedShaderTimeSeconds;
         state.lastFrameTimeMs = 0;
         state.lastFlowTimeMs = -Infinity;
         state.rafId = requestAnimationFrame(tick);
         return;
       }
+      state.animationStartRealMs = typeof performance !== "undefined" ? performance.now() : 0;
+      state.animationStartShaderTimeSeconds = state.lastUsedShaderTimeSeconds;
       drawStillFrame();
     }
 
