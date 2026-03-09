@@ -1,0 +1,279 @@
+"use client";
+
+import { GradientRenderer } from "@/engine/renderer";
+import { normalizePreset } from "@/lib/preset";
+import type { GradientPreset } from "@/types/preset";
+import { resolveAutoMode, resolveMountOptions, shouldAnimate } from "./runtime-modes";
+import type {
+  GradientInstance,
+  GradientMountMode,
+  GradientMountOptions,
+  GradientMountTarget,
+  ResolvedGradientMountOptions,
+  RuntimeModeState,
+} from "./runtime-types";
+
+function resolveTarget(target: GradientMountTarget): HTMLElement {
+  if (typeof target === "string") {
+    const element = document.querySelector<HTMLElement>(target);
+    if (!element) {
+      throw new Error(`Gradient target "${target}" was not found.`);
+    }
+
+    return element;
+  }
+
+  return target;
+}
+
+function ensureContainerStyles(target: HTMLElement): void {
+  const computed = window.getComputedStyle(target);
+
+  if (computed.position === "static") {
+    target.style.position = "relative";
+  }
+
+  if (computed.overflow === "visible") {
+    target.style.overflow = "hidden";
+  }
+}
+
+function createLayer(target: HTMLElement): HTMLDivElement {
+  const layer = document.createElement("div");
+  layer.dataset.gradientLayer = "true";
+  layer.setAttribute("aria-hidden", "true");
+  layer.style.cssText = "position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:0;";
+  target.prepend(layer);
+  return layer;
+}
+
+function createCanvas(layer: HTMLElement): HTMLCanvasElement {
+  const canvas = document.createElement("canvas");
+  canvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none;";
+  layer.appendChild(canvas);
+  return canvas;
+}
+
+function getRuntimeState(): RuntimeModeState {
+  return {
+    hovered: false,
+    inView: true,
+    visible: !document.hidden,
+    reducedMotion:
+      typeof window.matchMedia === "function"
+        ? window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        : false,
+    manuallyPaused: false,
+  };
+}
+
+function readTargetSize(target: HTMLElement): { width: number; height: number } {
+  const rect = target.getBoundingClientRect();
+
+  return {
+    width: Math.max(1, Math.round(rect.width || target.clientWidth || window.innerWidth)),
+    height: Math.max(1, Math.round(rect.height || target.clientHeight || window.innerHeight)),
+  };
+}
+
+function getEffectiveMode(
+  target: HTMLElement,
+  options: ResolvedGradientMountOptions
+): GradientMountMode {
+  if (options.mode !== "auto") {
+    return options.mode;
+  }
+
+  const { width, height } = readTargetSize(target);
+  return resolveAutoMode(width, height);
+}
+
+export function mountGradient(
+  targetInput: GradientMountTarget,
+  presetInput: GradientPreset,
+  initialOptions?: Partial<GradientMountOptions>
+): GradientInstance {
+  const target = resolveTarget(targetInput);
+  ensureContainerStyles(target);
+
+  const layer = createLayer(target);
+  const canvas = createCanvas(layer);
+  const renderer = GradientRenderer.create(canvas);
+  const mediaQuery =
+    typeof window.matchMedia === "function"
+      ? window.matchMedia("(prefers-reduced-motion: reduce)")
+      : null;
+
+  let preset = normalizePreset(presetInput);
+  let options = resolveMountOptions(preset, initialOptions);
+  let state = getRuntimeState();
+  let resizeObserver: ResizeObserver | null = null;
+  let intersectionObserver: IntersectionObserver | null = null;
+  let destroyed = false;
+  let hoverListenersAttached = false;
+
+  const applyRendererConfig = () => {
+    const { width, height } = readTargetSize(target);
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const scaledWidth = width * dpr * options.resolutionScale;
+    const scaledHeight = height * dpr * options.resolutionScale;
+    const pixelCount = scaledWidth * scaledHeight;
+    const safetyScale =
+      pixelCount > options.maxRenderPixels
+        ? Math.sqrt(options.maxRenderPixels / pixelCount)
+        : 1;
+
+    renderer.setConfig({
+      resolutionScale: Math.max(0.25, options.resolutionScale * safetyScale),
+      fpsCap: options.fpsCap,
+      flowMapSize: options.flowMapSize,
+      flowFps: options.flowFps,
+    });
+    renderer.resize(width, height);
+  };
+
+  const syncHoverListeners = () => {
+    const effectiveMode = getEffectiveMode(target, options);
+    const needsHoverListeners = effectiveMode === "hover";
+
+    if (needsHoverListeners && !hoverListenersAttached) {
+      target.addEventListener("pointerenter", handlePointerEnter);
+      target.addEventListener("pointerleave", handlePointerLeave);
+      hoverListenersAttached = true;
+      return;
+    }
+
+    if (!needsHoverListeners && hoverListenersAttached) {
+      target.removeEventListener("pointerenter", handlePointerEnter);
+      target.removeEventListener("pointerleave", handlePointerLeave);
+      hoverListenersAttached = false;
+      state.hovered = false;
+    }
+  };
+
+  const syncLoopState = () => {
+    if (destroyed) {
+      return;
+    }
+
+    applyRendererConfig();
+    syncHoverListeners();
+
+    const effectiveMode = getEffectiveMode(target, options);
+    const animate = shouldAnimate(effectiveMode, state, options);
+
+    renderer.stop();
+
+    if (animate) {
+      renderer.start(() => preset.params);
+      return;
+    }
+
+    renderer.renderStillFrame(preset.params);
+  };
+
+  const handleResize = () => {
+    syncLoopState();
+  };
+
+  function handlePointerEnter() {
+    state = { ...state, hovered: true };
+    syncLoopState();
+  }
+
+  function handlePointerLeave() {
+    state = { ...state, hovered: false };
+    syncLoopState();
+  }
+
+  const handleVisibilityChange = () => {
+    state = { ...state, visible: !document.hidden };
+    syncLoopState();
+  };
+
+  const handleReducedMotionChange = (event: MediaQueryListEvent | MediaQueryList) => {
+    state = { ...state, reducedMotion: event.matches };
+    syncLoopState();
+  };
+
+  resizeObserver = new ResizeObserver(handleResize);
+  resizeObserver.observe(target);
+
+  if (typeof IntersectionObserver !== "undefined") {
+    intersectionObserver = new IntersectionObserver(
+      (entries) => {
+        state = { ...state, inView: !!entries[0]?.isIntersecting };
+        syncLoopState();
+      },
+      { threshold: 0.01 }
+    );
+    intersectionObserver.observe(target);
+  }
+
+  document.addEventListener("visibilitychange", handleVisibilityChange);
+
+  if (mediaQuery) {
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", handleReducedMotionChange);
+    } else if (typeof mediaQuery.addListener === "function") {
+      mediaQuery.addListener(handleReducedMotionChange);
+    }
+  }
+
+  syncLoopState();
+
+  return {
+    updatePreset(nextPreset) {
+      preset = normalizePreset(nextPreset);
+      options = resolveMountOptions(preset, options);
+      syncLoopState();
+    },
+    updateOptions(nextOptions) {
+      options = resolveMountOptions(preset, { ...options, ...nextOptions });
+      syncLoopState();
+    },
+    resize() {
+      syncLoopState();
+    },
+    renderStill() {
+      renderer.stop();
+      renderer.renderStillFrame(preset.params);
+    },
+    pause() {
+      state = { ...state, manuallyPaused: true };
+      syncLoopState();
+    },
+    resume() {
+      state = { ...state, manuallyPaused: false };
+      syncLoopState();
+    },
+    destroy() {
+      if (destroyed) {
+        return;
+      }
+
+      destroyed = true;
+      renderer.stop();
+      renderer.destroy();
+      resizeObserver?.disconnect();
+      intersectionObserver?.disconnect();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      if (hoverListenersAttached) {
+        target.removeEventListener("pointerenter", handlePointerEnter);
+        target.removeEventListener("pointerleave", handlePointerLeave);
+      }
+      if (mediaQuery) {
+        if (typeof mediaQuery.removeEventListener === "function") {
+          mediaQuery.removeEventListener("change", handleReducedMotionChange);
+        } else if (typeof mediaQuery.removeListener === "function") {
+          mediaQuery.removeListener(handleReducedMotionChange);
+        }
+      }
+      layer.remove();
+    },
+  };
+}
+
+export const Gradient = {
+  mount: mountGradient,
+};

@@ -14,7 +14,7 @@ export function Pricing({ onPurchase }: PricingProps) {
           Full access
         </h2>
         <p className="text-white/70 text-lg mb-8">
-          $5 one-time. All presets. Generator. Export embed, ZIP, and PNG.
+          $5 one-time. All presets. Generator. Export embed, PNG, and preset JSON.
         </p>
         <ul className="text-left text-white/80 text-sm space-y-2 mb-10">
           <li>✓ Unlimited exports</li>

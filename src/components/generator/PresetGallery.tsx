@@ -1,9 +1,9 @@
 "use client";
 
 import { useCallback } from "react";
+import { getPresetName } from "@/lib/preset";
 import { useGradientStore } from "@/store/useGradientStore";
 import { getAllPresets } from "@/presets";
-import type { Preset } from "@/types/preset";
 import { usePresetThumbnails } from "@/hooks/usePresetThumbnails";
 import { ScrollArea } from "@/components/ui/ScrollArea";
 
@@ -61,11 +61,11 @@ export function PresetGallery() {
       <ScrollArea className="h-48" type="scroll">
         <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 pr-2">
           {presets.map((preset) => {
-          const isActive =
-            activePreset?.preset_name === preset.preset_name;
+          const presetName = getPresetName(preset);
+          const isActive = getPresetName(activePreset) === presetName;
           return (
             <button
-              key={preset.preset_name}
+              key={presetName}
               type="button"
               onClick={() => applyPreset(preset)}
               className={`
@@ -74,9 +74,9 @@ export function PresetGallery() {
               `}
             >
               <div className="aspect-video w-full shrink-0 bg-neutral-900 overflow-hidden">
-                {thumbnails[preset.preset_name] ? (
+                {thumbnails[presetName] ? (
                   <img
-                    src={thumbnails[preset.preset_name]}
+                    src={thumbnails[presetName]}
                     alt=""
                     className="w-full h-full object-cover"
                   />
@@ -84,13 +84,15 @@ export function PresetGallery() {
                   <div
                     className="w-full h-full"
                     style={{
-                      background: `linear-gradient(135deg, ${preset.uniform_palette_colors_hex.slice(0, 3).join(", ")})`,
+                      background: `linear-gradient(135deg, ${preset.params.uniform_palette_colors_hex
+                        .slice(0, 3)
+                        .join(", ")})`,
                     }}
                   />
                 )}
               </div>
               <span className="p-1.5 text-xs text-white/80 truncate text-center">
-                {preset.preset_name}
+                {presetName}
               </span>
             </button>
           );

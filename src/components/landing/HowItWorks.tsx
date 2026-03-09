@@ -3,7 +3,11 @@
 const STEPS = [
   { step: 1, title: "Pick a preset", desc: "Choose from dozens of hand-tuned gradients or randomize." },
   { step: 2, title: "Customize", desc: "Tweak palette, motion, warp, and post-processing in real time." },
-  { step: 3, title: "Export", desc: "Copy embed code, download ZIP, or export PNG. All self-contained." },
+  {
+    step: 3,
+    title: "Export",
+    desc: "Copy embed code, export a PNG, or save your preset JSON. Wallpaper Engine stays optional.",
+  },
 ];
 
 export function HowItWorks() {

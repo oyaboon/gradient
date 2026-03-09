@@ -1,222 +1,510 @@
 /**
- * Generate self-contained embed: a div + script that runs the gradient in any HTML page.
- * Two-pass flow-map architecture: low-res noise → full-res composite.
- * No external imports; works in a blank index.html.
+ * Generate the shared browser runtime distributed to developer exports.
+ * The runtime is downloaded once per project and reused by short mount snippets.
  */
 
-import type { GradientParams } from "@/types/preset";
-import { VERTEX_SOURCE, FLOW_FRAGMENT_SOURCE, COMPOSITE_FRAGMENT_SOURCE } from "./shaders";
+import {
+  VERTEX_SOURCE,
+  FLOW_FRAGMENT_SOURCE,
+  COMPOSITE_FRAGMENT_SOURCE,
+} from "./shaders";
 
-export function generateEmbedCode(
-  params: GradientParams,
-  fallbackDataUrl?: string | null
-): string {
-  const paramsJson = JSON.stringify(params);
+export const RUNTIME_FILENAME = "gradient-runtime.js";
+
+export function generateRuntimeJavascript(): string {
   const vertexStr = JSON.stringify(VERTEX_SOURCE);
   const flowFragStr = JSON.stringify(FLOW_FRAGMENT_SOURCE);
   const compositeFragStr = JSON.stringify(COMPOSITE_FRAGMENT_SOURCE);
-  const fallbackStr = fallbackDataUrl ? JSON.stringify(fallbackDataUrl) : "null";
 
   const scriptContent = `
 (function() {
-  var params = ${paramsJson};
   var vertexSource = ${vertexStr};
   var flowFragSource = ${flowFragStr};
   var compositeFragSource = ${compositeFragStr};
-  var fallbackDataUrl = ${fallbackStr};
-  var FLOW_MAP_SIZE = 384;
+  var DEFAULT_MAX_RENDER_PIXELS = 3500000;
 
-  var container = document.getElementById('gradient-embed-container');
-  if (!container) {
-    container = document.createElement('div');
-    container.id = 'gradient-embed-container';
-    container.style.cssText = 'position:relative;width:100%;height:100%;min-height:100vh';
-    document.body.appendChild(container);
+  function resolveTarget(target) {
+    if (!target) return null;
+    if (typeof target === "string") return document.querySelector(target);
+    if (target && target.nodeType === 1) return target;
+    return null;
   }
 
-  var canvas = document.createElement('canvas');
-  canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:block';
-  container.appendChild(canvas);
-
-  var gl = canvas.getContext('webgl2', { alpha: false, depth: false, antialias: false });
-  if (!gl) {
-    if (fallbackDataUrl) {
-      var img = document.createElement('img');
-      img.src = fallbackDataUrl;
-      img.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover';
-      container.appendChild(img);
+  function ensureMountStyles(container) {
+    if (!(container instanceof HTMLElement)) return;
+    var computed = window.getComputedStyle(container);
+    if (computed.position === "static") {
+      container.style.position = "relative";
     }
-    return;
-  }
-
-  function compileShader(type, source) {
-    var shader = gl.createShader(type);
-    gl.shaderSource(shader, source);
-    gl.compileShader(shader);
-    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-      throw new Error(gl.getShaderInfoLog(shader));
+    if (computed.overflow === "visible") {
+      container.style.overflow = "hidden";
     }
-    return shader;
   }
 
-  function buildProgram(vsSource, fsSource) {
-    var vs = compileShader(gl.VERTEX_SHADER, vsSource);
-    var fs = compileShader(gl.FRAGMENT_SHADER, fsSource);
-    var prog = gl.createProgram();
-    gl.attachShader(prog, vs);
-    gl.attachShader(prog, fs);
-    gl.linkProgram(prog);
-    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
-      throw new Error(gl.getProgramInfoLog(prog));
-    }
-    gl.deleteShader(vs);
-    gl.deleteShader(fs);
-    return prog;
+  function createLayer(container) {
+    var layer = document.createElement("div");
+    layer.setAttribute("data-gradient-layer", "true");
+    layer.setAttribute("aria-hidden", "true");
+    layer.style.cssText = "position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:0;";
+    container.prepend(layer);
+    return layer;
   }
 
-  var flowProg = buildProgram(vertexSource, flowFragSource);
-  var compositeProg = buildProgram(vertexSource, compositeFragSource);
-
-  var quad = new Float32Array([-1,-1, 1,-1, -1,1, -1,1, 1,-1, 1,1]);
-  var buf = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-  gl.bufferData(gl.ARRAY_BUFFER, quad, gl.STATIC_DRAW);
-
-  // Flow map FBO
-  gl.getExtension('EXT_color_buffer_float');
-  var flowTex = gl.createTexture();
-  gl.bindTexture(gl.TEXTURE_2D, flowTex);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, FLOW_MAP_SIZE, FLOW_MAP_SIZE, 0, gl.RGBA, gl.HALF_FLOAT, null);
-
-  var fbo = gl.createFramebuffer();
-  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
-  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, flowTex, 0);
-  if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, FLOW_MAP_SIZE, FLOW_MAP_SIZE, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, flowTex, 0);
-  }
-  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-  gl.bindTexture(gl.TEXTURE_2D, null);
-
-  // Flow shader uniforms
-  var flowLoc = {
-    u_time: gl.getUniformLocation(flowProg, 'uniform_time_seconds'),
-    u_aspect: gl.getUniformLocation(flowProg, 'uniform_display_aspect'),
-    u_seed: gl.getUniformLocation(flowProg, 'uniform_seed'),
-    u_motion_speed: gl.getUniformLocation(flowProg, 'uniform_motion_speed'),
-    u_flow_cs: gl.getUniformLocation(flowProg, 'uniform_flow_rotation_cs'),
-    u_drift_x: gl.getUniformLocation(flowProg, 'uniform_flow_drift_speed_x'),
-    u_drift_y: gl.getUniformLocation(flowProg, 'uniform_flow_drift_speed_y'),
-    u_warp_str: gl.getUniformLocation(flowProg, 'uniform_warp_strength'),
-    u_warp_scale: gl.getUniformLocation(flowProg, 'uniform_warp_scale'),
-    u_turbulence: gl.getUniformLocation(flowProg, 'uniform_turbulence'),
-    u_reduce_motion: gl.getUniformLocation(flowProg, 'uniform_reduce_motion_enabled')
-  };
-
-  // Composite shader uniforms
-  function hexToRgb(hex) {
-    var h = hex.replace(/^#/, '');
-    var n = parseInt(h, 16);
-    return [(n >> 16) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+  function createCanvas(layer) {
+    var canvas = document.createElement("canvas");
+    canvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none;";
+    layer.appendChild(canvas);
+    return canvas;
   }
 
-  var compLoc = {
-    u_flow_map: gl.getUniformLocation(compositeProg, 'uniform_flow_map'),
-    u_res: gl.getUniformLocation(compositeProg, 'uniform_canvas_resolution_pixels'),
-    u_dpr: gl.getUniformLocation(compositeProg, 'uniform_device_pixel_ratio'),
-    u_seed: gl.getUniformLocation(compositeProg, 'uniform_seed'),
-    u_palette_count: gl.getUniformLocation(compositeProg, 'uniform_palette_color_count'),
-    u_palette: gl.getUniformLocation(compositeProg, 'uniform_palette_colors_rgb'),
-    u_brightness: gl.getUniformLocation(compositeProg, 'uniform_brightness'),
-    u_contrast: gl.getUniformLocation(compositeProg, 'uniform_contrast'),
-    u_saturation: gl.getUniformLocation(compositeProg, 'uniform_saturation'),
-    u_grain_amt: gl.getUniformLocation(compositeProg, 'uniform_grain_amount'),
-    u_grain_size: gl.getUniformLocation(compositeProg, 'uniform_grain_size')
-  };
-
-  var startTime = (typeof performance !== 'undefined' ? performance.now() : 0) / 1000;
-  var displayW = 1, displayH = 1;
-  var lastFlowTimeMs = -100;
-  var flowIntervalMs = 1000 / 30;
-
-  function resize() {
-    displayW = container.clientWidth || window.innerWidth;
-    displayH = container.clientHeight || window.innerHeight;
-    var dpr = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = Math.max(1, displayW * dpr);
-    canvas.height = Math.max(1, displayH * dpr);
-  }
-  resize();
-  window.addEventListener('resize', resize);
-
-  function drawQuad(prog) {
-    var posLoc = gl.getAttribLocation(prog, 'a_position');
-    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-    gl.enableVertexAttribArray(posLoc);
-    gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
+  function chooseAutoMode(width, height) {
+    var area = width * height;
+    if (area <= 140000) return "static";
+    if (area <= 700000) return "inView";
+    return "animated";
   }
 
-  function draw() {
-    var nowMs = (typeof performance !== 'undefined' ? performance.now() : 0);
-    var time = nowMs / 1000 - startTime;
-    var aspect = displayW / Math.max(displayH, 1);
-    var flowDue = (nowMs - lastFlowTimeMs) >= flowIntervalMs;
+  function quantizeFlowMapSize(value) {
+    if (value >= 448) return 512;
+    if (value >= 320) return 384;
+    return 256;
+  }
 
-    if (flowDue) {
-      var rad = params.uniform_flow_rotation_radians;
-      gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
-      gl.viewport(0, 0, FLOW_MAP_SIZE, FLOW_MAP_SIZE);
-      gl.useProgram(flowProg);
-      gl.uniform1f(flowLoc.u_time, time);
-      gl.uniform1f(flowLoc.u_aspect, aspect);
-      gl.uniform1f(flowLoc.u_seed, params.uniform_seed);
-      gl.uniform1f(flowLoc.u_motion_speed, params.uniform_motion_speed);
-      gl.uniform2f(flowLoc.u_flow_cs, Math.cos(rad), Math.sin(rad));
-      if (flowLoc.u_drift_x != null) gl.uniform1f(flowLoc.u_drift_x, params.uniform_flow_drift_speed_x ?? 0);
-      if (flowLoc.u_drift_y != null) gl.uniform1f(flowLoc.u_drift_y, params.uniform_flow_drift_speed_y ?? 0);
-      gl.uniform1f(flowLoc.u_warp_str, params.uniform_warp_strength);
-      gl.uniform1f(flowLoc.u_warp_scale, params.uniform_warp_scale);
-      gl.uniform1f(flowLoc.u_turbulence, params.uniform_turbulence);
-      gl.uniform1i(flowLoc.u_reduce_motion, params.uniform_reduce_motion_enabled);
-      drawQuad(flowProg);
-      lastFlowTimeMs = nowMs;
+  function quantizeFlowFps(value) {
+    if (value >= 45) return 60;
+    if (value >= 22.5) return 30;
+    return 15;
+  }
+
+  function clamp(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+  }
+
+  function normalizePreset(rawPreset) {
+    if (!rawPreset || typeof rawPreset !== "object") {
+      throw new Error("Preset must be an object.");
     }
 
-    // Pass B: composite
+    if (rawPreset.presetVersion !== 1 || rawPreset.engineId !== "grain-v1" || !rawPreset.params) {
+      throw new Error("Unsupported preset format.");
+    }
+
+    return rawPreset;
+  }
+
+  function resolveMountOptions(preset, userOptions) {
+    var exportDefaults = (preset.exportDefaults && preset.exportDefaults.quality) || {};
+    var options = userOptions || {};
+    return {
+      mode: options.mode || "auto",
+      resolutionScale: clamp(
+        options.resolutionScale != null ? options.resolutionScale : (exportDefaults.resolutionScale != null ? exportDefaults.resolutionScale : 0.75),
+        0.5,
+        1
+      ),
+      fpsCap: (options.fpsCap != null ? options.fpsCap : exportDefaults.fpsCap) >= 45 ? 60 : 30,
+      flowMapSize: quantizeFlowMapSize(clamp(
+        options.flowMapSize != null ? options.flowMapSize : (exportDefaults.flowMapSize != null ? exportDefaults.flowMapSize : 384),
+        256,
+        512
+      )),
+      flowFps: quantizeFlowFps(clamp(
+        options.flowFps != null ? options.flowFps : (exportDefaults.flowFps != null ? exportDefaults.flowFps : 30),
+        15,
+        60
+      )),
+      maxRenderPixels: Math.round(clamp(
+        options.maxRenderPixels != null ? options.maxRenderPixels : (exportDefaults.maxRenderPixels != null ? exportDefaults.maxRenderPixels : DEFAULT_MAX_RENDER_PIXELS),
+        250000,
+        16000000
+      )),
+      respectReducedMotion: options.respectReducedMotion !== false,
+      pauseWhenHidden: options.pauseWhenHidden !== false,
+      pauseWhenOffscreen: options.pauseWhenOffscreen !== false
+    };
+  }
+
+  function mountGradient(targetInput, rawPreset, userOptions) {
+    var target = resolveTarget(targetInput);
+    if (!target) throw new Error("Gradient target was not found.");
+    ensureMountStyles(target);
+
+    var preset = normalizePreset(rawPreset);
+    var params = preset.params;
+    var options = resolveMountOptions(preset, userOptions);
+    var layer = createLayer(target);
+    var canvas = createCanvas(layer);
+
+    var gl = canvas.getContext("webgl2", {
+      alpha: false,
+      depth: false,
+      antialias: false
+    });
+
+    if (!gl) {
+      throw new Error("WebGL2 is unavailable.");
+    }
+
+    function compileShader(type, source) {
+      var shader = gl.createShader(type);
+      gl.shaderSource(shader, source);
+      gl.compileShader(shader);
+      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        throw new Error(gl.getShaderInfoLog(shader) || "Shader compile failed.");
+      }
+      return shader;
+    }
+
+    function buildProgram(vsSource, fsSource) {
+      var vs = compileShader(gl.VERTEX_SHADER, vsSource);
+      var fs = compileShader(gl.FRAGMENT_SHADER, fsSource);
+      var prog = gl.createProgram();
+      gl.attachShader(prog, vs);
+      gl.attachShader(prog, fs);
+      gl.linkProgram(prog);
+      if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+        throw new Error(gl.getProgramInfoLog(prog) || "Program link failed.");
+      }
+      gl.deleteShader(vs);
+      gl.deleteShader(fs);
+      return prog;
+    }
+
+    function hexToRgb(hex) {
+      var normalized = hex.replace(/^#/, "");
+      if (normalized.length === 3) {
+        normalized = normalized[0] + normalized[0] +
+          normalized[1] + normalized[1] +
+          normalized[2] + normalized[2];
+      }
+      var n = parseInt(normalized, 16);
+      return [(n >> 16) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+    }
+
+    var flowProgram = buildProgram(vertexSource, flowFragSource);
+    var compositeProgram = buildProgram(vertexSource, compositeFragSource);
+    var quad = new Float32Array([-1,-1, 1,-1, -1,1, -1,1, 1,-1, 1,1]);
+    var positionBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, quad, gl.STATIC_DRAW);
+
+    gl.getExtension("EXT_color_buffer_float");
+    var flowMapSize = options.flowMapSize;
+    var flowTexture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, flowTexture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, flowMapSize, flowMapSize, 0, gl.RGBA, gl.HALF_FLOAT, null);
+
+    var flowFramebuffer = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, flowFramebuffer);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, flowTexture, 0);
+    if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, flowMapSize, flowMapSize, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, flowTexture, 0);
+    }
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.viewport(0, 0, canvas.width, canvas.height);
-    gl.useProgram(compositeProg);
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, flowTex);
-    gl.uniform1i(compLoc.u_flow_map, 0);
-    gl.uniform2f(compLoc.u_res, canvas.width, canvas.height);
-    gl.uniform1f(compLoc.u_dpr, window.devicePixelRatio || 1);
-    gl.uniform1f(compLoc.u_seed, params.uniform_seed);
-    var count = Math.min(6, params.uniform_palette_colors_hex.length);
-    gl.uniform1i(compLoc.u_palette_count, count);
-    var rgb = params.uniform_palette_colors_hex.slice(0, 6).map(hexToRgb);
-    while (rgb.length < 6) rgb.push([0,0,0]);
-    gl.uniform3fv(compLoc.u_palette, rgb.flat());
-    gl.uniform1f(compLoc.u_brightness, params.uniform_brightness);
-    gl.uniform1f(compLoc.u_contrast, params.uniform_contrast);
-    gl.uniform1f(compLoc.u_saturation, params.uniform_saturation);
-    gl.uniform1f(compLoc.u_grain_amt, params.uniform_grain_amount);
-    gl.uniform1f(compLoc.u_grain_size, params.uniform_grain_size);
-    drawQuad(compositeProg);
+    gl.bindTexture(gl.TEXTURE_2D, null);
 
-    requestAnimationFrame(draw);
+    var flowLoc = {
+      u_time: gl.getUniformLocation(flowProgram, "uniform_time_seconds"),
+      u_aspect: gl.getUniformLocation(flowProgram, "uniform_display_aspect"),
+      u_seed: gl.getUniformLocation(flowProgram, "uniform_seed"),
+      u_motion_speed: gl.getUniformLocation(flowProgram, "uniform_motion_speed"),
+      u_flow_cs: gl.getUniformLocation(flowProgram, "uniform_flow_rotation_cs"),
+      u_drift_x: gl.getUniformLocation(flowProgram, "uniform_flow_drift_speed_x"),
+      u_drift_y: gl.getUniformLocation(flowProgram, "uniform_flow_drift_speed_y"),
+      u_warp_str: gl.getUniformLocation(flowProgram, "uniform_warp_strength"),
+      u_warp_scale: gl.getUniformLocation(flowProgram, "uniform_warp_scale"),
+      u_turbulence: gl.getUniformLocation(flowProgram, "uniform_turbulence"),
+      u_reduce_motion: gl.getUniformLocation(flowProgram, "uniform_reduce_motion_enabled")
+    };
+
+    var compLoc = {
+      u_flow_map: gl.getUniformLocation(compositeProgram, "uniform_flow_map"),
+      u_res: gl.getUniformLocation(compositeProgram, "uniform_canvas_resolution_pixels"),
+      u_dpr: gl.getUniformLocation(compositeProgram, "uniform_device_pixel_ratio"),
+      u_seed: gl.getUniformLocation(compositeProgram, "uniform_seed"),
+      u_palette_count: gl.getUniformLocation(compositeProgram, "uniform_palette_color_count"),
+      u_palette: gl.getUniformLocation(compositeProgram, "uniform_palette_colors_rgb"),
+      u_brightness: gl.getUniformLocation(compositeProgram, "uniform_brightness"),
+      u_contrast: gl.getUniformLocation(compositeProgram, "uniform_contrast"),
+      u_saturation: gl.getUniformLocation(compositeProgram, "uniform_saturation"),
+      u_grain_amt: gl.getUniformLocation(compositeProgram, "uniform_grain_amount"),
+      u_grain_size: gl.getUniformLocation(compositeProgram, "uniform_grain_size")
+    };
+
+    var state = {
+      displayWidth: 1,
+      displayHeight: 1,
+      devicePixelRatio: Math.min(window.devicePixelRatio || 1, 2),
+      effectiveMode: options.mode,
+      isHovered: false,
+      isInView: true,
+      isVisible: !document.hidden,
+      isPaused: false,
+      lastFlowTimeMs: -Infinity,
+      lastFrameTimeMs: 0,
+      rafId: null
+    };
+
+    var reducedMotionQuery =
+      typeof window.matchMedia === "function"
+        ? window.matchMedia("(prefers-reduced-motion: reduce)")
+        : null;
+    var prefersReducedMotion = reducedMotionQuery ? reducedMotionQuery.matches : false;
+
+    function drawQuad(program) {
+      var posLoc = gl.getAttribLocation(program, "a_position");
+      gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+      gl.enableVertexAttribArray(posLoc);
+      gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+    }
+
+    function resizeCanvas() {
+      var rect = target.getBoundingClientRect();
+      state.displayWidth = Math.max(1, Math.round(rect.width || target.clientWidth || window.innerWidth));
+      state.displayHeight = Math.max(1, Math.round(rect.height || target.clientHeight || window.innerHeight));
+      state.devicePixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+      state.effectiveMode = options.mode === "auto"
+        ? chooseAutoMode(state.displayWidth, state.displayHeight)
+        : options.mode;
+
+      var scaledWidth = state.displayWidth * state.devicePixelRatio * options.resolutionScale;
+      var scaledHeight = state.displayHeight * state.devicePixelRatio * options.resolutionScale;
+      var pixelCount = scaledWidth * scaledHeight;
+      var safetyScale = pixelCount > options.maxRenderPixels
+        ? Math.sqrt(options.maxRenderPixels / pixelCount)
+        : 1;
+
+      canvas.width = Math.max(1, Math.round(scaledWidth * safetyScale));
+      canvas.height = Math.max(1, Math.round(scaledHeight * safetyScale));
+    }
+
+    function canAnimate() {
+      if (state.isPaused) return false;
+      if (options.respectReducedMotion && prefersReducedMotion) return false;
+      if (options.pauseWhenHidden && !state.isVisible) return false;
+      if (state.effectiveMode === "static") return false;
+      if ((state.effectiveMode === "inView" || options.pauseWhenOffscreen) && !state.isInView) return false;
+      if (state.effectiveMode === "hover" && !state.isHovered) return false;
+      return true;
+    }
+
+    function drawFrame(nowMs, forceFlowUpdate) {
+      var time = nowMs / 1000;
+      var aspect = state.displayWidth / Math.max(state.displayHeight, 1);
+      var flowDue =
+        forceFlowUpdate ||
+        (nowMs - state.lastFlowTimeMs) >= (1000 / options.flowFps);
+
+      if (flowDue) {
+        var rad = params.uniform_flow_rotation_radians;
+        gl.bindFramebuffer(gl.FRAMEBUFFER, flowFramebuffer);
+        gl.viewport(0, 0, flowMapSize, flowMapSize);
+        gl.useProgram(flowProgram);
+        gl.uniform1f(flowLoc.u_time, time);
+        gl.uniform1f(flowLoc.u_aspect, aspect);
+        gl.uniform1f(flowLoc.u_seed, params.uniform_seed);
+        gl.uniform1f(flowLoc.u_motion_speed, params.uniform_motion_speed);
+        gl.uniform2f(flowLoc.u_flow_cs, Math.cos(rad), Math.sin(rad));
+        if (flowLoc.u_drift_x != null) gl.uniform1f(flowLoc.u_drift_x, params.uniform_flow_drift_speed_x || 0);
+        if (flowLoc.u_drift_y != null) gl.uniform1f(flowLoc.u_drift_y, params.uniform_flow_drift_speed_y || 0);
+        gl.uniform1f(flowLoc.u_warp_str, params.uniform_warp_strength);
+        gl.uniform1f(flowLoc.u_warp_scale, params.uniform_warp_scale);
+        gl.uniform1f(flowLoc.u_turbulence, params.uniform_turbulence);
+        gl.uniform1i(flowLoc.u_reduce_motion, params.uniform_reduce_motion_enabled);
+        drawQuad(flowProgram);
+        state.lastFlowTimeMs = nowMs;
+      }
+
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.useProgram(compositeProgram);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, flowTexture);
+      gl.uniform1i(compLoc.u_flow_map, 0);
+      gl.uniform2f(compLoc.u_res, canvas.width, canvas.height);
+      gl.uniform1f(compLoc.u_dpr, state.devicePixelRatio);
+      gl.uniform1f(compLoc.u_seed, params.uniform_seed);
+      var count = Math.min(6, params.uniform_palette_colors_hex.length);
+      gl.uniform1i(compLoc.u_palette_count, count);
+      var rgb = params.uniform_palette_colors_hex.slice(0, 6).map(hexToRgb);
+      while (rgb.length < 6) rgb.push([0, 0, 0]);
+      gl.uniform3fv(compLoc.u_palette, rgb.flat());
+      gl.uniform1f(compLoc.u_brightness, params.uniform_brightness);
+      gl.uniform1f(compLoc.u_contrast, params.uniform_contrast);
+      gl.uniform1f(compLoc.u_saturation, params.uniform_saturation);
+      gl.uniform1f(compLoc.u_grain_amt, params.uniform_grain_amount);
+      gl.uniform1f(compLoc.u_grain_size, params.uniform_grain_size);
+      drawQuad(compositeProgram);
+
+    }
+
+    function stopLoop() {
+      if (state.rafId != null) {
+        cancelAnimationFrame(state.rafId);
+        state.rafId = null;
+      }
+    }
+
+    function tick(nowMs) {
+      if (!canAnimate()) {
+        stopLoop();
+        return;
+      }
+
+      state.rafId = requestAnimationFrame(tick);
+      if ((nowMs - state.lastFrameTimeMs) < (1000 / options.fpsCap)) {
+        return;
+      }
+
+      state.lastFrameTimeMs = nowMs;
+      drawFrame(nowMs, false);
+    }
+
+    function drawStillFrame() {
+      drawFrame(typeof performance !== "undefined" ? performance.now() : Date.now(), true);
+    }
+
+    function syncLoopState() {
+      stopLoop();
+      if (canAnimate()) {
+        state.lastFrameTimeMs = 0;
+        state.lastFlowTimeMs = -Infinity;
+        state.rafId = requestAnimationFrame(tick);
+        return;
+      }
+      drawStillFrame();
+    }
+
+    function handleVisibilityChange() {
+      state.isVisible = !document.hidden;
+      syncLoopState();
+    }
+
+    function handlePointerEnter() {
+      state.isHovered = true;
+      syncLoopState();
+    }
+
+    function handlePointerLeave() {
+      state.isHovered = false;
+      syncLoopState();
+    }
+
+    function handleResize() {
+      resizeCanvas();
+      syncLoopState();
+    }
+
+    var resizeObserver =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(handleResize)
+        : null;
+    if (resizeObserver) resizeObserver.observe(target);
+    else window.addEventListener("resize", handleResize);
+
+    var intersectionObserver =
+      typeof IntersectionObserver !== "undefined"
+        ? new IntersectionObserver(function(entries) {
+            state.isInView = !!(entries[0] && entries[0].isIntersecting);
+            syncLoopState();
+          }, { threshold: 0.01 })
+        : null;
+    if (intersectionObserver) intersectionObserver.observe(target);
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    function syncPointerListeners() {
+      target.removeEventListener("pointerenter", handlePointerEnter);
+      target.removeEventListener("pointerleave", handlePointerLeave);
+      if (state.effectiveMode === "hover") {
+        target.addEventListener("pointerenter", handlePointerEnter);
+        target.addEventListener("pointerleave", handlePointerLeave);
+      } else {
+        state.isHovered = false;
+      }
+    }
+
+    var handleReducedMotionChange = function(event) {
+      prefersReducedMotion = !!event.matches;
+      handleResize();
+    };
+    if (reducedMotionQuery) {
+      if (typeof reducedMotionQuery.addEventListener === "function") {
+        reducedMotionQuery.addEventListener("change", handleReducedMotionChange);
+      } else if (typeof reducedMotionQuery.addListener === "function") {
+        reducedMotionQuery.addListener(handleReducedMotionChange);
+      }
+    }
+
+    resizeCanvas();
+    syncPointerListeners();
+    syncLoopState();
+
+    return {
+      updatePreset: function(nextPreset) {
+        preset = normalizePreset(nextPreset);
+        params = preset.params;
+        options = resolveMountOptions(preset, options);
+        resizeCanvas();
+        syncPointerListeners();
+        syncLoopState();
+      },
+      updateOptions: function(nextOptions) {
+        options = resolveMountOptions(preset, Object.assign({}, options, nextOptions || {}));
+        resizeCanvas();
+        syncPointerListeners();
+        syncLoopState();
+      },
+      resize: function() {
+        resizeCanvas();
+        syncPointerListeners();
+        syncLoopState();
+      },
+      renderStill: function() {
+        stopLoop();
+        drawStillFrame();
+      },
+      pause: function() {
+        state.isPaused = true;
+        syncLoopState();
+      },
+      resume: function() {
+        state.isPaused = false;
+        syncLoopState();
+      },
+      destroy: function() {
+        stopLoop();
+        document.removeEventListener("visibilitychange", handleVisibilityChange);
+        target.removeEventListener("pointerenter", handlePointerEnter);
+        target.removeEventListener("pointerleave", handlePointerLeave);
+        if (resizeObserver) resizeObserver.disconnect();
+        else window.removeEventListener("resize", handleResize);
+        if (intersectionObserver) intersectionObserver.disconnect();
+        if (reducedMotionQuery) {
+          if (typeof reducedMotionQuery.removeEventListener === "function") {
+            reducedMotionQuery.removeEventListener("change", handleReducedMotionChange);
+          } else if (typeof reducedMotionQuery.removeListener === "function") {
+            reducedMotionQuery.removeListener(handleReducedMotionChange);
+          }
+        }
+        gl.deleteProgram(flowProgram);
+        gl.deleteProgram(compositeProgram);
+        gl.deleteFramebuffer(flowFramebuffer);
+        gl.deleteTexture(flowTexture);
+        gl.deleteBuffer(positionBuffer);
+        layer.remove();
+      }
+    };
   }
-  draw();
+
+  window.Gradient = { mount: mountGradient };
 })();
 `;
 
-  return `<div id="gradient-embed-container" style="position:relative;width:100%;height:100%;min-height:100vh"></div>
-<script>
-${scriptContent.trim()}
-</script>`;
+  return scriptContent.trim() + "\n";
 }

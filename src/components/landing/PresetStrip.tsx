@@ -1,13 +1,14 @@
 "use client";
 
-import type { Preset } from "@/types/preset";
+import { getPresetName } from "@/lib/preset";
+import type { GradientPreset } from "@/types/preset";
 
 interface PresetStripProps {
-  presets: Preset[];
+  presets: GradientPreset[];
   activePresetName: string | null;
-  onSelect: (preset: Preset) => void;
+  onSelect: (preset: GradientPreset) => void;
   /** Optional: render a small preview for each preset. */
-  renderPreview?: (preset: Preset) => React.ReactNode;
+  renderPreview?: (preset: GradientPreset) => React.ReactNode;
 }
 
 export function PresetStrip({
@@ -24,10 +25,11 @@ export function PresetStrip({
         </h2>
         <div className="flex flex-wrap gap-4 justify-center">
           {presets.map((preset) => {
-            const isActive = activePresetName === preset.preset_name;
+            const presetName = getPresetName(preset);
+            const isActive = activePresetName === presetName;
             return (
               <button
-                key={preset.preset_name}
+                key={presetName}
                 type="button"
                 onClick={() => onSelect(preset)}
                 className={`
@@ -41,12 +43,12 @@ export function PresetStrip({
                   <div
                     className="w-20 h-12 rounded bg-white/10"
                     style={{
-                      background: `linear-gradient(90deg, ${preset.uniform_palette_colors_hex.slice(0, 3).join(", ")})`,
+                      background: `linear-gradient(90deg, ${preset.params.uniform_palette_colors_hex.slice(0, 3).join(", ")})`,
                     }}
                   />
                 )}
                 <span className="text-xs text-white/80 font-medium">
-                  {preset.preset_name}
+                  {presetName}
                 </span>
               </button>
             );

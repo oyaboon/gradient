@@ -2,31 +2,19 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { GradientParams, Preset } from "@/types/preset";
+import { applyPresetToStore } from "@/lib/preset";
+import {
+  DEFAULT_GRADIENT_PARAMS,
+  DEFAULT_PRESET_QUALITY,
+  type GradientParams,
+  type GradientPreset,
+} from "@/types/preset";
 
 export type AppMode = "landing" | "generator";
 
-const DEFAULT_PARAMS: GradientParams = {
-  uniform_seed: 42,
-  uniform_palette_colors_hex: ["#0a0a12", "#1a1a2e", "#2563eb", "#f97316", "#fbbf24"],
-  uniform_motion_speed: 0.6,
-  uniform_flow_rotation_radians: 0.9,
-  uniform_flow_drift_speed_x: 0,
-  uniform_flow_drift_speed_y: 0,
-  uniform_warp_strength: 0.5,
-  uniform_warp_scale: 2.2,
-  uniform_turbulence: 0.4,
-  uniform_brightness: 1.05,
-  uniform_contrast: 1.12,
-  uniform_saturation: 1.2,
-  uniform_grain_amount: 0.12,
-  uniform_grain_size: 1.3,
-  uniform_reduce_motion_enabled: 0,
-};
-
 export interface GradientState {
   params: GradientParams;
-  activePreset: Preset | null;
+  activePreset: GradientPreset | null;
   mode: AppMode;
   licenseValid: boolean;
   qualityResolutionScale: number;
@@ -37,8 +25,8 @@ export interface GradientState {
 
   setParams: (params: GradientParams) => void;
   setParamsPartial: (partial: Partial<GradientParams>) => void;
-  setActivePreset: (preset: Preset | null) => void;
-  applyPreset: (preset: Preset) => void;
+  setActivePreset: (preset: GradientPreset | null) => void;
+  applyPreset: (preset: GradientPreset) => void;
   setMode: (mode: AppMode) => void;
   setLicenseValid: (valid: boolean) => void;
   enterGenerator: () => void;
@@ -52,14 +40,14 @@ export interface GradientState {
 export const useGradientStore = create<GradientState>()(
   persist(
     (set) => ({
-      params: DEFAULT_PARAMS,
+      params: DEFAULT_GRADIENT_PARAMS,
       activePreset: null,
       mode: "landing",
       licenseValid: false,
-      qualityResolutionScale: 0.75,
-      qualityFpsCap: 60,
-      qualityFlowMapSize: 384,
-      qualityFlowFps: 30,
+      qualityResolutionScale: DEFAULT_PRESET_QUALITY.qualityResolutionScale,
+      qualityFpsCap: DEFAULT_PRESET_QUALITY.qualityFpsCap,
+      qualityFlowMapSize: DEFAULT_PRESET_QUALITY.qualityFlowMapSize,
+      qualityFlowFps: DEFAULT_PRESET_QUALITY.qualityFlowFps,
       fallbackDataUrl: null,
 
       setParams: (params) => set({ params }),
@@ -68,31 +56,7 @@ export const useGradientStore = create<GradientState>()(
 
       setActivePreset: (activePreset) => set({ activePreset }),
 
-      applyPreset: (preset) =>
-        set({
-          params: {
-            uniform_seed: preset.uniform_seed,
-            uniform_palette_colors_hex: [...preset.uniform_palette_colors_hex],
-            uniform_motion_speed: preset.uniform_motion_speed,
-            uniform_flow_rotation_radians: preset.uniform_flow_rotation_radians,
-            uniform_flow_drift_speed_x: preset.uniform_flow_drift_speed_x,
-            uniform_flow_drift_speed_y: preset.uniform_flow_drift_speed_y,
-            uniform_warp_strength: preset.uniform_warp_strength,
-            uniform_warp_scale: preset.uniform_warp_scale,
-            uniform_turbulence: preset.uniform_turbulence,
-            uniform_brightness: preset.uniform_brightness,
-            uniform_contrast: preset.uniform_contrast,
-            uniform_saturation: preset.uniform_saturation,
-            uniform_grain_amount: preset.uniform_grain_amount,
-            uniform_grain_size: preset.uniform_grain_size,
-            uniform_reduce_motion_enabled: preset.uniform_reduce_motion_enabled,
-          },
-          activePreset: preset,
-          qualityResolutionScale: preset.quality_resolution_scale,
-          qualityFpsCap: preset.quality_fps_cap,
-          qualityFlowMapSize: preset.quality_flow_map_size ?? 384,
-          qualityFlowFps: preset.quality_flow_fps ?? 30,
-        }),
+      applyPreset: (preset) => set(applyPresetToStore(preset)),
 
       setMode: (mode) => set({ mode }),
 

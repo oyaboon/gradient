@@ -132,6 +132,7 @@ export class GradientRenderer {
   private config: RendererConfig;
   private startTime = 0;
   private rafId: number | null = null;
+  private destroyed = false;
   private lastFrameTime = 0;
   private frameInterval = 1000 / 60;
   private lastFlowUpdateTimeMs = 0;
@@ -277,6 +278,7 @@ export class GradientRenderer {
   }
 
   draw(params: GradientParams, options?: { forceFlowUpdate?: boolean }): void {
+    if (this.destroyed) return;
     const gl = this.gl;
     const canvas = gl.canvas as HTMLCanvasElement;
     const canvasW = canvas.width;
@@ -342,11 +344,17 @@ export class GradientRenderer {
     this.drawQuad();
   }
 
+  renderStillFrame(params: GradientParams): void {
+    this.lastFlowUpdateTimeMs = -this.flowFrameIntervalMs;
+    this.draw(params, { forceFlowUpdate: true });
+  }
+
   startLoop(params: () => GradientParams): void {
     this.startTime =
       (typeof performance !== "undefined" ? performance.now() : 0) / 1000;
 
     const tick = (now: number) => {
+      if (this.destroyed) return;
       this.rafId = requestAnimationFrame(tick);
       const elapsed = now - this.lastFrameTime;
       if (elapsed >= this.frameInterval) {
@@ -361,11 +369,19 @@ export class GradientRenderer {
     this.rafId = requestAnimationFrame(tick);
   }
 
+  start(params: () => GradientParams): void {
+    this.startLoop(params);
+  }
+
   stopLoop(): void {
     if (this.rafId != null) {
       cancelAnimationFrame(this.rafId);
       this.rafId = null;
     }
+  }
+
+  stop(): void {
+    this.stopLoop();
   }
 
   capturePng(
@@ -408,6 +424,7 @@ export class GradientRenderer {
   }
 
   destroy(): void {
+    this.destroyed = true;
     this.stopLoop();
     const gl = this.gl;
     if (this.quadVao) {

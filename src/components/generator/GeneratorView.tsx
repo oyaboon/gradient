@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useCallback } from "react";
+import { useRef, useCallback } from "react";
 import { useGradientStore } from "@/store/useGradientStore";
 import { GradientCanvas } from "@/components/canvas/GradientCanvas";
 import { PresetGallery } from "./PresetGallery";
@@ -8,18 +8,22 @@ import { ControlsPanel } from "./ControlsPanel";
 import { ExportPanel } from "./ExportPanel";
 import { ScrollArea } from "@/components/ui/ScrollArea";
 import type { GradientRenderer } from "@/engine/renderer";
-import type { Preset } from "@/types/preset";
-import { generateEmbedCode } from "@/engine/export-embed";
+import type { DeveloperExportOptions, PngExportOptions } from "@/types/export";
+import { generateRuntimeJavascript, RUNTIME_FILENAME } from "@/engine/export-embed";
 import {
   capturePngAsDataUrl,
   downloadPng,
-  PNG_SIZES,
 } from "@/engine/export-png";
 import {
-  createGradientZip,
   createWallpaperEngineZip,
   downloadZip,
 } from "@/engine/export-zip";
+import {
+  createHtmlExample,
+  createMountSnippet,
+  createReactExample,
+} from "@/engine/runtime-snippets";
+import { buildPresetFromStore, getPresetName, parsePresetJson } from "@/lib/preset";
 import { useToastStore } from "@/store/useToastStore";
 
 export function GeneratorView() {
@@ -33,106 +37,140 @@ export function GeneratorView() {
   const fallbackDataUrl = useGradientStore((s) => s.fallbackDataUrl);
   const setFallbackDataUrl = useGradientStore((s) => s.setFallbackDataUrl);
   const setMode = useGradientStore((s) => s.setMode);
-  const setQualityResolutionScale = useGradientStore((s) => s.setQualityResolutionScale);
-  const setQualityFpsCap = useGradientStore((s) => s.setQualityFpsCap);
-  const setQualityFlowMapSize = useGradientStore((s) => s.setQualityFlowMapSize);
-  const setQualityFlowFps = useGradientStore((s) => s.setQualityFlowFps);
 
   const rendererRef = useRef<GradientRenderer | null>(null);
-  const [copyEmbedLoading, setCopyEmbedLoading] = useState(false);
   const showToast = useToastStore((s) => s.show);
 
-  const buildPresetForExport = useCallback((): Preset => {
-    const name = activePreset?.preset_name ?? "Exported";
-    return {
-      preset_version: "1.0",
-      preset_name: name,
-      ...params,
-      quality_resolution_scale: qualityResolutionScale,
-      quality_fps_cap: qualityFpsCap,
-      quality_flow_map_size: qualityFlowMapSize,
-      quality_flow_fps: qualityFlowFps,
-      export_fallback_image_data_url: fallbackDataUrl ?? undefined,
-    };
+  const buildPresetForExport = useCallback(() => {
+    return buildPresetFromStore({
+      params,
+      activePreset,
+      qualityResolutionScale,
+      qualityFpsCap,
+      qualityFlowMapSize,
+      qualityFlowFps,
+    });
   }, [
-    activePreset?.preset_name,
+    activePreset,
     params,
     qualityResolutionScale,
     qualityFpsCap,
     qualityFlowMapSize,
     qualityFlowFps,
-    fallbackDataUrl,
   ]);
 
-  const handleCopyEmbed = useCallback(async () => {
-    setCopyEmbedLoading(true);
-    try {
-      const code = generateEmbedCode(params, fallbackDataUrl);
-      await navigator.clipboard.writeText(code);
-      showToast("Embed code copied");
-    } catch {
-      showToast("Copy failed");
-    } finally {
-      setCopyEmbedLoading(false);
-    }
-  }, [params, fallbackDataUrl, showToast]);
+  const copyText = useCallback(
+    async (value: string, successMessage: string) => {
+      if (navigator.clipboard?.writeText) {
+        try {
+          await navigator.clipboard.writeText(value);
+          showToast(successMessage);
+          return;
+        } catch {
+          // Fall through to execCommand fallback
+        }
+      }
 
-  const handleDownloadZip = useCallback(async () => {
-    try {
+      const textarea = document.createElement("textarea");
+      textarea.value = value;
+      textarea.setAttribute("readonly", "");
+      textarea.style.position = "fixed";
+      textarea.style.top = "0";
+      textarea.style.left = "0";
+      textarea.style.opacity = "0";
+      textarea.style.pointerEvents = "none";
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      const copied = document.execCommand("copy");
+      document.body.removeChild(textarea);
+
+      if (!copied) {
+        throw new Error("Copy failed");
+      }
+
+      showToast(successMessage);
+    },
+    [showToast]
+  );
+
+  const downloadText = useCallback((content: string, filename: string, mimeType: string) => {
+    const blob = new Blob([content], { type: mimeType });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }, []);
+
+  const getSnippetPayload = useCallback(
+    (options: DeveloperExportOptions) => {
       const preset = buildPresetForExport();
-      const blob = await createGradientZip(preset, fallbackDataUrl);
-      downloadZip(blob, "gradient-export.zip");
-      showToast("ZIP downloaded");
-    } catch {
-      showToast("Export failed");
-    }
-  }, [buildPresetForExport, fallbackDataUrl, showToast]);
+      const { selector, ...mountOptions } = options;
+      const filteredMountOptions = Object.fromEntries(
+        Object.entries(mountOptions).filter(([, value]) => value != null)
+      );
+
+      return {
+        preset,
+        selector,
+        mountOptions: filteredMountOptions,
+      };
+    },
+    [buildPresetForExport]
+  );
 
   const handleDownloadWallpaperEngine = useCallback(async () => {
     try {
       const preset = buildPresetForExport();
       const blob = await createWallpaperEngineZip(preset, fallbackDataUrl);
-      const name = (activePreset?.preset_name ?? "gradient").replace(/\s+/g, "-").toLowerCase();
+      const name = getPresetName(activePreset).replace(/\s+/g, "-").toLowerCase();
       downloadZip(blob, `gradient-wallpaper-engine-${name}.zip`);
       showToast("Wallpaper Engine pack downloaded");
     } catch {
       showToast("Export failed");
     }
-  }, [buildPresetForExport, fallbackDataUrl, activePreset?.preset_name, showToast]);
+  }, [buildPresetForExport, fallbackDataUrl, activePreset, showToast]);
 
-  const handleDownloadPng = useCallback(() => {
+  const handleDownloadPng = useCallback((options: PngExportOptions) => {
     const renderer = rendererRef.current;
     if (!renderer) {
       showToast("Canvas not ready");
       return;
     }
     try {
-      const { width, height } = PNG_SIZES[0];
+      const { width, height } = options;
       const dataUrl = capturePngAsDataUrl(renderer, params, width, height);
-      const name = activePreset?.preset_name ?? "gradient";
+      const name = getPresetName(activePreset);
       downloadPng(dataUrl, `${name.replace(/\s+/g, "-").toLowerCase()}.png`);
       showToast("PNG downloaded");
     } catch {
       showToast("Export failed");
     }
-  }, [params, activePreset?.preset_name, showToast]);
+  }, [params, activePreset, showToast]);
 
-  const handleExportPresetJson = useCallback(() => {
+  const handleCopyPresetJson = useCallback(async () => {
     try {
       const preset = buildPresetForExport();
-      const blob = new Blob([JSON.stringify(preset, null, 2)], {
-        type: "application/json",
-      });
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = `${(preset.preset_name || "preset").replace(/\s+/g, "-").toLowerCase()}.json`;
-      a.click();
-      URL.revokeObjectURL(a.href);
+      await copyText(JSON.stringify(preset, null, 2), "Preset JSON copied");
+    } catch {
+      showToast("Copy failed");
+    }
+  }, [buildPresetForExport, copyText, showToast]);
+
+  const handleDownloadPresetJson = useCallback(() => {
+    try {
+      const preset = buildPresetForExport();
+      downloadText(
+        JSON.stringify(preset, null, 2),
+        `${getPresetName(preset).replace(/\s+/g, "-").toLowerCase()}.json`,
+        "application/json"
+      );
       showToast("Preset JSON exported");
     } catch {
       showToast("Export failed");
     }
-  }, [buildPresetForExport, showToast]);
+  }, [buildPresetForExport, downloadText, showToast]);
 
   const handleImportPresetJson = useCallback(
     (file: File) => {
@@ -140,47 +178,75 @@ export function GeneratorView() {
       reader.onload = () => {
         try {
           const raw = reader.result as string;
-          const data = JSON.parse(raw) as unknown;
-          if (!data || typeof data !== "object" || !Array.isArray((data as Preset).uniform_palette_colors_hex)) {
-            showToast("Invalid preset JSON");
-            return;
-          }
-          const preset = data as Preset;
-          applyPreset({
-            preset_version: preset.preset_version || "1.0",
-            preset_name: preset.preset_name || "Imported",
-            uniform_seed: preset.uniform_seed,
-            uniform_palette_colors_hex: preset.uniform_palette_colors_hex,
-            uniform_motion_speed: preset.uniform_motion_speed,
-            uniform_flow_rotation_radians: preset.uniform_flow_rotation_radians,
-            uniform_flow_drift_speed_x: preset.uniform_flow_drift_speed_x ?? 0,
-            uniform_flow_drift_speed_y: preset.uniform_flow_drift_speed_y ?? 0,
-            uniform_warp_strength: preset.uniform_warp_strength,
-            uniform_warp_scale: preset.uniform_warp_scale,
-            uniform_turbulence: preset.uniform_turbulence,
-            uniform_brightness: preset.uniform_brightness,
-            uniform_contrast: preset.uniform_contrast,
-            uniform_saturation: preset.uniform_saturation,
-            uniform_grain_amount: preset.uniform_grain_amount,
-            uniform_grain_size: preset.uniform_grain_size,
-            uniform_reduce_motion_enabled: (preset.uniform_reduce_motion_enabled ?? 0) as 0 | 1,
-            quality_resolution_scale: preset.quality_resolution_scale ?? 0.75,
-            quality_fps_cap: (preset.quality_fps_cap ?? 60) as 30 | 60,
-            quality_flow_map_size: preset.quality_flow_map_size,
-            quality_flow_fps: preset.quality_flow_fps,
-          });
-          setQualityResolutionScale(preset.quality_resolution_scale ?? 0.75);
-          setQualityFpsCap((preset.quality_fps_cap ?? 60) as 30 | 60);
-          if (preset.quality_flow_map_size != null) setQualityFlowMapSize(preset.quality_flow_map_size);
-          if (preset.quality_flow_fps != null) setQualityFlowFps(preset.quality_flow_fps);
+          const preset = parsePresetJson(raw);
+          applyPreset(preset);
           showToast("Preset imported");
-        } catch {
-          showToast("Invalid preset JSON");
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : "Invalid preset JSON";
+          showToast(message);
         }
       };
       reader.readAsText(file);
     },
-    [applyPreset, setQualityResolutionScale, setQualityFpsCap, setQualityFlowMapSize, setQualityFlowFps, showToast]
+    [applyPreset, showToast]
+  );
+
+  const handleDownloadRuntimeJs = useCallback(() => {
+    try {
+      downloadText(generateRuntimeJavascript(), RUNTIME_FILENAME, "text/javascript");
+      showToast("Runtime JS downloaded");
+    } catch {
+      showToast("Export failed");
+    }
+  }, [downloadText, showToast]);
+
+  const handleCopyMountSnippet = useCallback(
+    async (options: DeveloperExportOptions) => {
+      try {
+        const payload = getSnippetPayload(options);
+        await copyText(
+          createMountSnippet(payload.preset, payload),
+          "Mount snippet copied"
+        );
+      } catch {
+        showToast("Copy failed");
+      }
+    },
+    [copyText, getSnippetPayload, showToast]
+  );
+
+  const handleCopyHtmlExample = useCallback(
+    async (options: DeveloperExportOptions) => {
+      try {
+        const payload = getSnippetPayload(options);
+        await copyText(
+          createHtmlExample(payload.preset, {
+            ...payload,
+            runtimeFilename: RUNTIME_FILENAME,
+          }),
+          "HTML example copied"
+        );
+      } catch {
+        showToast("Copy failed");
+      }
+    },
+    [copyText, getSnippetPayload, showToast]
+  );
+
+  const handleCopyReactExample = useCallback(
+    async (options: DeveloperExportOptions) => {
+      try {
+        const payload = getSnippetPayload(options);
+        await copyText(
+          createReactExample(payload.preset, payload),
+          "React example copied"
+        );
+      } catch {
+        showToast("Copy failed");
+      }
+    },
+    [copyText, getSnippetPayload, showToast]
   );
 
   return (
@@ -219,13 +285,15 @@ export function GeneratorView() {
           <PresetGallery />
           <ControlsPanel />
           <ExportPanel
-            onCopyEmbed={handleCopyEmbed}
-            onDownloadZip={handleDownloadZip}
             onDownloadWallpaperEngine={handleDownloadWallpaperEngine}
             onDownloadPng={handleDownloadPng}
-            onExportPresetJson={handleExportPresetJson}
+            onCopyPresetJson={handleCopyPresetJson}
+            onDownloadPresetJson={handleDownloadPresetJson}
             onImportPresetJson={handleImportPresetJson}
-            copyEmbedLoading={copyEmbedLoading}
+            onDownloadRuntimeJs={handleDownloadRuntimeJs}
+            onCopyMountSnippet={handleCopyMountSnippet}
+            onCopyHtmlExample={handleCopyHtmlExample}
+            onCopyReactExample={handleCopyReactExample}
           />
         </div>
       </ScrollArea>

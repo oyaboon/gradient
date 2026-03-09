@@ -1,8 +1,9 @@
-import type { Preset } from "@/types/preset";
+import { normalizePreset } from "@/lib/preset";
+import type { GradientPreset, LegacyPreset } from "@/types/preset";
 
-const V = "1.0";
+const V = "1.0" as const;
 
-export const PRESETS: Preset[] = [
+const LEGACY_PRESETS: LegacyPreset[] = [
   {
     preset_version: V,
     preset_name: "Neon Drift",
@@ -340,3 +341,7 @@ export const PRESETS: Preset[] = [
     quality_fps_cap: 60,
   },
 ];
+
+export const PRESETS: GradientPreset[] = LEGACY_PRESETS.map((preset) =>
+  normalizePreset(preset)
+);

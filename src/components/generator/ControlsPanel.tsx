@@ -40,7 +40,7 @@ export function ControlsPanel() {
   const reduceMotion = params.uniform_reduce_motion_enabled;
 
   return (
-    <div className="flex flex-col gap-1 border border-white/10 rounded-lg overflow-hidden bg-neutral-900/80">
+    <div className="flex flex-col border border-white/10 rounded-lg overflow-hidden bg-neutral-900/80">
       {SECTIONS.map(({ id, label, Component }) => {
         const isOpen = openIds.has(id);
         return (
@@ -48,7 +48,7 @@ export function ControlsPanel() {
             <button
               type="button"
               onClick={() => toggleSection(id)}
-              className="w-full px-4 py-3 flex items-center justify-between text-left text-sm font-medium text-white hover:bg-white/5"
+              className={`w-full px-4 py-3 flex items-center justify-between text-left text-sm font-medium text-white hover:bg-white/5 ${isOpen ? "bg-white/5" : ""}`}
             >
               {label}
               <span className="text-white/50">{isOpen ? "−" : "+"}</span>

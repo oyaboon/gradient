@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import type { Preset } from "@/types/preset";
+import { getPresetName } from "@/lib/preset";
+import type { GradientPreset } from "@/types/preset";
 import { GradientRenderer } from "@/engine/renderer";
 
 const THUMB_WIDTH = 160;
@@ -11,10 +12,10 @@ const THUMB_HEIGHT = 96;
  * Generates static (one-frame) shader thumbnails for presets using a single
  * offscreen renderer. Yields between presets to keep UI responsive.
  */
-export function usePresetThumbnails(presets: Preset[]): Record<string, string> {
+export function usePresetThumbnails(presets: GradientPreset[]): Record<string, string> {
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({});
   const cancelledRef = useRef(false);
-  const presetKey = presets.map((p) => p.preset_name).join(",");
+  const presetKey = presets.map((preset) => getPresetName(preset)).join(",");
 
   useEffect(() => {
     if (typeof document === "undefined" || presets.length === 0) return;
@@ -48,12 +49,12 @@ export function usePresetThumbnails(presets: Preset[]): Record<string, string> {
       const preset = list[index];
       try {
         const dataUrl = renderer.capturePng(
-          preset,
+          preset.params,
           THUMB_WIDTH,
           THUMB_HEIGHT
         );
         if (!cancelledRef.current) {
-          setThumbnails((prev) => ({ ...prev, [preset.preset_name]: dataUrl }));
+          setThumbnails((prev) => ({ ...prev, [getPresetName(preset)]: dataUrl }));
         }
       } catch {
         // skip this preset
