@@ -610,7 +610,18 @@ void main() {
   };
 
   // src/lib/compact-preset.ts
-  var COMPACT_PRESET_PREFIX = "g1:";
+  var COMPACT_PRESET_PREFIX_G1 = "g1:";
+  var COMPACT_PRESET_PREFIX_G2 = "g2:";
+  var SCALE = 1e3;
+  var QUALITY_DEFAULTS = {
+    resolutionScale: DEFAULT_PRESET_QUALITY.qualityResolutionScale,
+    fpsCap: DEFAULT_PRESET_QUALITY.qualityFpsCap,
+    flowMapSize: DEFAULT_PRESET_QUALITY.qualityFlowMapSize,
+    flowFps: DEFAULT_PRESET_QUALITY.qualityFlowFps,
+    maxRenderPixels: 35e5
+  };
+  var FLOW_MAP_SIZE_VALUES = [256, 384, 512];
+  var FLOW_FPS_VALUES = [15, 30, 60];
   function decodeUtf8(input) {
     return new TextDecoder().decode(input);
   }
@@ -631,15 +642,24 @@ void main() {
     const padded = padding === 0 ? normalized : `${normalized}${"=".repeat(4 - padding)}`;
     return fromBase64(padded);
   }
-  function isCompactPresetString(value) {
-    return typeof value === "string" && value.startsWith(COMPACT_PRESET_PREFIX);
+  function clamp(value, min, max) {
+    return Math.min(max, Math.max(min, value));
   }
-  function decodeCompactPreset(compactPreset) {
-    if (!isCompactPresetString(compactPreset)) {
+  function isCompactPresetString(value) {
+    return typeof value === "string" && (value.startsWith(COMPACT_PRESET_PREFIX_G1) || value.startsWith(COMPACT_PRESET_PREFIX_G2));
+  }
+  function isCompactPresetG1(value) {
+    return typeof value === "string" && value.startsWith(COMPACT_PRESET_PREFIX_G1);
+  }
+  function isCompactPresetG2(value) {
+    return typeof value === "string" && value.startsWith(COMPACT_PRESET_PREFIX_G2);
+  }
+  function decodeCompactPresetV1(compactPreset) {
+    if (!isCompactPresetG1(compactPreset)) {
       throw new Error("Unsupported compact preset format.");
     }
     const payloadText = decodeUtf8(
-      fromBase64Url(compactPreset.slice(COMPACT_PRESET_PREFIX.length))
+      fromBase64Url(compactPreset.slice(COMPACT_PRESET_PREFIX_G1.length))
     );
     let payload;
     try {
@@ -658,12 +678,83 @@ void main() {
       exportDefaults: payload.q ? { quality: payload.q } : void 0
     };
   }
+  function intToHex(n) {
+    const r = (n >> 16 & 255).toString(16).padStart(2, "0");
+    const g = (n >> 8 & 255).toString(16).padStart(2, "0");
+    const b = (n & 255).toString(16).padStart(2, "0");
+    return `#${r}${g}${b}`;
+  }
+  function decodeQuality(arr) {
+    return {
+      resolutionScale: clamp(arr[0] / SCALE, 0.5, 1),
+      fpsCap: arr[1] >= 1 ? 60 : 30,
+      flowMapSize: FLOW_MAP_SIZE_VALUES[clamp(arr[2], 0, 2)],
+      flowFps: FLOW_FPS_VALUES[clamp(arr[3], 0, 2)],
+      maxRenderPixels: clamp(arr[4], 25e4, 16e6)
+    };
+  }
+  function decodeCompactPresetV2(compactPreset) {
+    if (!isCompactPresetG2(compactPreset)) {
+      throw new Error("Unsupported compact preset format.");
+    }
+    const payloadText = decodeUtf8(
+      fromBase64Url(compactPreset.slice(COMPACT_PRESET_PREFIX_G2.length))
+    );
+    let raw;
+    try {
+      raw = JSON.parse(payloadText);
+    } catch (e) {
+      throw new Error("Invalid compact preset payload.");
+    }
+    if (!Array.isArray(raw) || raw.length < 16) {
+      throw new Error("Compact preset payload is incomplete.");
+    }
+    const arr = raw;
+    const paletteInts = Array.isArray(arr[1]) ? arr[1] : [];
+    const hexColors = paletteInts.slice(0, 6).map(intToHex);
+    if (hexColors.length < 3) {
+      throw new Error("Compact preset must have at least 3 palette colors.");
+    }
+    const qualityArr = raw[15] != null && Array.isArray(raw[15]) ? raw[15] : null;
+    const params = {
+      uniform_seed: clamp(Number(arr[0]), 0, 1e6),
+      uniform_palette_colors_hex: hexColors,
+      uniform_motion_speed: clamp(Number(arr[2]) / SCALE, 0, 2),
+      uniform_flow_rotation_radians: clamp(Number(arr[3]) / SCALE, 0, Math.PI * 2),
+      uniform_flow_drift_speed_x: clamp(Number(arr[4]) / SCALE, -0.3, 0.3),
+      uniform_flow_drift_speed_y: clamp(Number(arr[5]) / SCALE, -0.3, 0.3),
+      uniform_warp_strength: clamp(Number(arr[6]) / SCALE, 0, 1.2),
+      uniform_warp_scale: clamp(Number(arr[7]) / SCALE, 0.2, 6),
+      uniform_turbulence: clamp(Number(arr[8]) / SCALE, 0, 1),
+      uniform_brightness: clamp(Number(arr[9]) / SCALE, 0, 2),
+      uniform_contrast: clamp(Number(arr[10]) / SCALE, 0, 2),
+      uniform_saturation: clamp(Number(arr[11]) / SCALE, 0, 2),
+      uniform_grain_amount: clamp(Number(arr[12]) / SCALE, 0, 0.25),
+      uniform_grain_size: clamp(Number(arr[13]) / SCALE, 0.5, 1.6),
+      uniform_reduce_motion_enabled: Number(arr[14]) >= 0.5 ? 1 : 0
+    };
+    return {
+      presetVersion: PRESET_VERSION,
+      engineId: GRADIENT_ENGINE_ID,
+      params,
+      exportDefaults: qualityArr != null ? { quality: decodeQuality(qualityArr) } : void 0
+    };
+  }
+  function decodeCompactPreset(compactPreset) {
+    if (isCompactPresetG2(compactPreset)) {
+      return decodeCompactPresetV2(compactPreset);
+    }
+    if (isCompactPresetG1(compactPreset)) {
+      return decodeCompactPresetV1(compactPreset);
+    }
+    throw new Error("Unsupported compact preset format.");
+  }
 
   // src/lib/preset.ts
   function isRecord(value) {
     return typeof value === "object" && value !== null;
   }
-  function clamp(value, min, max) {
+  function clamp2(value, min, max) {
     return Math.min(max, Math.max(min, value));
   }
   function readString(value, fallback) {
@@ -683,7 +774,7 @@ void main() {
     if (value == null) {
       return fallback;
     }
-    return clamp(readRequiredFiniteNumber(value, key), min, max);
+    return clamp2(readRequiredFiniteNumber(value, key), min, max);
   }
   function readPaletteColors(value) {
     if (value == null) {
@@ -935,7 +1026,7 @@ void main() {
 
   // src/engine/runtime-modes.ts
   var DEFAULT_MAX_RENDER_PIXELS = 35e5;
-  function clamp2(value, min, max) {
+  function clamp3(value, min, max) {
     return Math.min(max, Math.max(min, value));
   }
   function quantizeFlowMapSize(size) {
@@ -962,20 +1053,20 @@ void main() {
     const presetMaxRenderPixels = (_b = (_a = preset.exportDefaults) == null ? void 0 : _a.quality) == null ? void 0 : _b.maxRenderPixels;
     return {
       mode: "animated",
-      resolutionScale: clamp2(
+      resolutionScale: clamp3(
         (_c = options == null ? void 0 : options.resolutionScale) != null ? _c : presetQuality.qualityResolutionScale,
         0.5,
         1
       ),
       fpsCap: ((_d = options == null ? void 0 : options.fpsCap) != null ? _d : presetQuality.qualityFpsCap) >= 45 ? 60 : 30,
       flowMapSize: quantizeFlowMapSize(
-        clamp2((_e = options == null ? void 0 : options.flowMapSize) != null ? _e : presetQuality.qualityFlowMapSize, 256, 512)
+        clamp3((_e = options == null ? void 0 : options.flowMapSize) != null ? _e : presetQuality.qualityFlowMapSize, 256, 512)
       ),
       flowFps: quantizeFlowFps(
-        clamp2((_f = options == null ? void 0 : options.flowFps) != null ? _f : presetQuality.qualityFlowFps, 15, 60)
+        clamp3((_f = options == null ? void 0 : options.flowFps) != null ? _f : presetQuality.qualityFlowFps, 15, 60)
       ),
       maxRenderPixels: Math.round(
-        clamp2((_h = (_g = options == null ? void 0 : options.maxRenderPixels) != null ? _g : presetMaxRenderPixels) != null ? _h : DEFAULT_MAX_RENDER_PIXELS, 25e4, 16e6)
+        clamp3((_h = (_g = options == null ? void 0 : options.maxRenderPixels) != null ? _g : presetMaxRenderPixels) != null ? _h : DEFAULT_MAX_RENDER_PIXELS, 25e4, 16e6)
       ),
       respectReducedMotion: (_i = options == null ? void 0 : options.respectReducedMotion) != null ? _i : true,
       pauseWhenHidden: (_j = options == null ? void 0 : options.pauseWhenHidden) != null ? _j : true,
@@ -1232,7 +1323,6 @@ void main() {
     let loopActive = false;
     let rafId = null;
     let refreshRafId = null;
-    let mutationObserver = null;
     let lastFrameTimeMs = 0;
     let lastAnimationTimeSeconds = 0;
     let hasPresentedFrame = false;
@@ -1437,10 +1527,6 @@ void main() {
       }
       warnIfEmpty();
     };
-    const syncMutationObserver = () => {
-      mutationObserver == null ? void 0 : mutationObserver.disconnect();
-      mutationObserver = null;
-    };
     function scheduleRefresh() {
       if (destroyed || refreshRafId != null) {
         return;
@@ -1452,7 +1538,6 @@ void main() {
         }
         syncTargets();
         const effectiveMode = getEffectiveMode();
-        syncMutationObserver();
         if (shouldLoop(effectiveMode)) {
           startLoop();
           if (pendingRender || !hasPresentedFrame) {
@@ -1540,7 +1625,6 @@ void main() {
           cancelAnimationFrame(refreshRafId);
           refreshRafId = null;
         }
-        mutationObserver == null ? void 0 : mutationObserver.disconnect();
         document.removeEventListener("visibilitychange", handleVisibilityChange);
         if (mediaQuery) {
           if (typeof mediaQuery.removeEventListener === "function") {

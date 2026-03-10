@@ -8,7 +8,7 @@ import { ControlsPanel } from "./ControlsPanel";
 import { ExportPanel } from "./ExportPanel";
 import { ScrollArea } from "@/components/ui/ScrollArea";
 import type { GradientRenderer } from "@/engine/renderer";
-import type { DeveloperExportOptions, PngExportOptions } from "@/types/export";
+import type { PngExportOptions } from "@/types/export";
 import {
   capturePngAsDataUrl,
   downloadPng,
@@ -18,14 +18,11 @@ import {
   downloadZip,
 } from "@/engine/export-zip";
 import {
-  createMountSnippet,
+  createReadablePresetExport,
+  createCompactPresetExport,
 } from "@/engine/runtime-snippets";
 import { buildPresetFromStore, getPresetName, parsePresetJson } from "@/lib/preset";
 import { useToastStore } from "@/store/useToastStore";
-import {
-  RUNTIME_GLOBAL_FILENAME,
-  RUNTIME_GLOBAL_PUBLIC_PATH,
-} from "@/runtime/runtime-artifacts";
 
 export function GeneratorView() {
   const params = useGradientStore((s) => s.params);
@@ -104,16 +101,6 @@ export function GeneratorView() {
     URL.revokeObjectURL(a.href);
   }, []);
 
-  const getSnippetPayload = useCallback(
-    (options: DeveloperExportOptions) => {
-      return {
-        preset: buildPresetForExport(),
-        exportOptions: options,
-      };
-    },
-    [buildPresetForExport]
-  );
-
   const handleDownloadWallpaperEngine = useCallback(async () => {
     try {
       const preset = buildPresetForExport();
@@ -186,17 +173,23 @@ export function GeneratorView() {
     [applyPreset, showToast]
   );
 
-  const handleCopySnippet = useCallback(
-    async (options: DeveloperExportOptions) => {
-      try {
-        const payload = getSnippetPayload(options);
-        await copyText(createMountSnippet(payload.preset, payload), "Snippet copied");
-      } catch {
-        showToast("Copy failed");
-      }
-    },
-    [copyText, getSnippetPayload, showToast]
-  );
+  const handleCopyReadablePreset = useCallback(async () => {
+    try {
+      const preset = buildPresetForExport();
+      await copyText(createReadablePresetExport(preset), "Readable preset copied");
+    } catch {
+      showToast("Copy failed");
+    }
+  }, [buildPresetForExport, copyText, showToast]);
+
+  const handleCopyCompactKey = useCallback(async () => {
+    try {
+      const preset = buildPresetForExport();
+      await copyText(createCompactPresetExport(preset), "Compact key copied");
+    } catch {
+      showToast("Copy failed");
+    }
+  }, [buildPresetForExport, copyText, showToast]);
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row">
@@ -239,9 +232,8 @@ export function GeneratorView() {
             onCopyPresetJson={handleCopyPresetJson}
             onDownloadPresetJson={handleDownloadPresetJson}
             onImportPresetJson={handleImportPresetJson}
-            runtimeDownloadUrl={RUNTIME_GLOBAL_PUBLIC_PATH}
-            runtimeFilename={RUNTIME_GLOBAL_FILENAME}
-            onCopySnippet={handleCopySnippet}
+            onCopyReadablePreset={handleCopyReadablePreset}
+            onCopyCompactKey={handleCopyCompactKey}
           />
         </div>
       </ScrollArea>

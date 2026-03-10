@@ -250,7 +250,6 @@ export function mountSharedGradient(
   let loopActive = false;
   let rafId: number | null = null;
   let refreshRafId: number | null = null;
-  let mutationObserver: MutationObserver | null = null;
   let lastFrameTimeMs = 0;
   let lastAnimationTimeSeconds = 0;
   let hasPresentedFrame = false;
@@ -505,11 +504,6 @@ export function mountSharedGradient(
     warnIfEmpty();
   };
 
-  const syncMutationObserver = () => {
-    mutationObserver?.disconnect();
-    mutationObserver = null;
-  };
-
   function scheduleRefresh(): void {
     if (destroyed || refreshRafId != null) {
       return;
@@ -523,7 +517,6 @@ export function mountSharedGradient(
 
       syncTargets();
       const effectiveMode = getEffectiveMode();
-      syncMutationObserver();
 
       if (shouldLoop(effectiveMode)) {
         startLoop();
@@ -620,7 +613,6 @@ export function mountSharedGradient(
         refreshRafId = null;
       }
 
-      mutationObserver?.disconnect();
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       if (mediaQuery) {
         if (typeof mediaQuery.removeEventListener === "function") {

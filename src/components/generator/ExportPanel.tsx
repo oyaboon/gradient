@@ -3,13 +3,8 @@
 import { useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { PNG_SIZES } from "@/engine/export-png";
-import type {
-  DeveloperExportOptions,
-  DeveloperPresetFormat,
-  ExportTab,
-  PngExportOptions,
-} from "@/types/export";
-import { DEVELOPER_PRESET_FORMATS, EXPORT_TABS } from "@/types/export";
+import type { ExportTab, PngExportOptions } from "@/types/export";
+import { EXPORT_TABS } from "@/types/export";
 
 const RUNTIME_DOWNLOAD_URL = "/api/gradient-runtime";
 
@@ -21,7 +16,8 @@ interface ExportPanelProps {
   onImportPresetJson: (file: File) => void;
   runtimeDownloadUrl?: string;
   runtimeFilename?: string;
-  onCopySnippet: (options: DeveloperExportOptions) => void | Promise<void>;
+  onCopyReadablePreset: () => void | Promise<void>;
+  onCopyCompactKey: () => void | Promise<void>;
 }
 
 type PngSizeMode = "hd" | "uhd" | "custom";
@@ -36,14 +32,14 @@ export function ExportPanel({
   onImportPresetJson,
   runtimeDownloadUrl = RUNTIME_DOWNLOAD_URL,
   runtimeFilename = "gradient-runtime.global.js",
-  onCopySnippet,
+  onCopyReadablePreset,
+  onCopyCompactKey,
 }: ExportPanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState<ExportTab>("developer");
   const [pngSizeMode, setPngSizeMode] = useState<PngSizeMode>("hd");
   const [customWidth, setCustomWidth] = useState("1920");
   const [customHeight, setCustomHeight] = useState("1080");
-  const [presetFormat, setPresetFormat] = useState<DeveloperPresetFormat>("readable");
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -83,10 +79,6 @@ export function ExportPanel({
       ? `Use values from 64 to ${MAX_CUSTOM_PNG_SIZE}px.`
       : null;
 
-  const buildDeveloperOptions = (): DeveloperExportOptions => ({
-    presetFormat,
-  });
-
   const tabButtonClass = (isActive: boolean) =>
     `rounded-md px-3 py-2 text-xs font-medium transition-colors ${
       isActive
@@ -113,45 +105,33 @@ export function ExportPanel({
       {activeTab === "developer" && (
         <div className="space-y-3">
           <p className="text-xs leading-5 text-white/60">
-            Download the runtime once, then paste a minimal snippet with either a readable
-            preset object or a compact `g1:` string.
+            Copy the preset (readable JSON or short compact key), then use it with the
+            runtime. Download the runtime separately when needed.
           </p>
-          <div className="space-y-2">
-            <span className="block text-xs text-white/70">Preset format</span>
-            <div className="space-y-2">
-              {DEVELOPER_PRESET_FORMATS.map((format) => (
-                <button
-                  key={format.value}
-                  type="button"
-                  onClick={() => setPresetFormat(format.value)}
-                  className={`w-full rounded-lg border px-3 py-2 text-left transition-colors ${
-                    presetFormat === format.value
-                      ? "border-white/50 bg-white/10"
-                      : "border-white/10 bg-black/10 hover:border-white/30"
-                  }`}
-                >
-                  <div className="text-sm text-white">{format.label}</div>
-                  <div className="text-[11px] text-white/55">{format.description}</div>
-                </button>
-              ))}
-            </div>
-          </div>
           <div className="grid gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={onCopyReadablePreset}
+              className="w-full"
+            >
+              Copy readable preset
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={onCopyCompactKey}
+              className="w-full"
+            >
+              Copy compact key
+            </Button>
             <a
               href={runtimeDownloadUrl}
               download={runtimeFilename}
               className="font-display font-medium rounded-lg transition-colors px-4 py-2 text-sm w-full text-center bg-transparent text-white border border-white/40 hover:border-white/70 hover:bg-white/5"
             >
-              Download Runtime JS
+              Download runtime
             </a>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => onCopySnippet(buildDeveloperOptions())}
-              className="w-full"
-            >
-              Copy Snippet
-            </Button>
           </div>
         </div>
       )}

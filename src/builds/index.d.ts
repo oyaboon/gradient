@@ -2,13 +2,15 @@ export type GradientMountMode = "animated" | "static" | "hover";
 export type GradientSharedMode = "animated" | "static";
 export type GradientFrameTransport = "auto" | "bitmaprenderer" | "2d";
 
-export type GradientMountTarget = string | Element;
+export type GradientMountTarget = string | HTMLElement;
+
+/** Targets for mountShared. Only HTMLElement instances are used; other elements are ignored. */
 export type GradientSharedMountTarget =
   | string
-  | Element
-  | Element[]
-  | NodeListOf<Element>
-  | Iterable<Element>;
+  | HTMLElement
+  | HTMLElement[]
+  | NodeListOf<HTMLElement>
+  | Iterable<HTMLElement>;
 
 export interface GradientParams {
   uniform_seed: number;
@@ -56,6 +58,7 @@ export interface LegacyPreset extends GradientParams {
   export_fallback_image_data_url?: string;
 }
 
+/** Preset object (readable or legacy) or compact key string (`g1:` or `g2:`). */
 export type GradientPresetInput = GradientPreset | LegacyPreset | string;
 
 export interface GradientRuntimeQualityOptions {

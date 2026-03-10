@@ -7,11 +7,14 @@ export type GradientSharedMode = "animated" | "static";
 export type GradientFrameTransport = "auto" | "2d" | "bitmaprenderer";
 
 export type GradientMountTarget = string | HTMLElement;
+
+/** Targets for mountShared. Runtime accepts only HTMLElement instances (filters by instanceof HTMLElement). */
 export type GradientSharedMountTarget =
   | string
   | HTMLElement
-  | ArrayLike<Element>
-  | Iterable<Element>;
+  | ArrayLike<HTMLElement>
+  | Iterable<HTMLElement>
+  | NodeListOf<HTMLElement>;
 
 export interface BaseGradientMountOptions {
   resolutionScale?: number;

@@ -315,7 +315,7 @@ function normalizeLegacyPreset(source: Record<string, unknown>): GradientPreset 
 
 export function normalizePreset(rawPreset: GradientPresetInput): GradientPreset {
   /**
-   * Runtime accepts either the canonical/readable preset object or a compact `g1:` string.
+   * Runtime accepts either the canonical/readable preset object or a compact string (`g1:` or `g2:`).
    * Compact input is decoded back into the canonical shape before normal validation runs.
    */
   if (isCompactPresetString(rawPreset)) {
@@ -338,7 +338,7 @@ export function normalizePreset(rawPreset: GradientPresetInput): GradientPreset 
 export function parsePresetJson(raw: string): GradientPreset {
   const trimmed = raw.trim();
   if (isCompactPresetString(trimmed)) {
-    return normalizePreset(trimmed);
+    return normalizePreset(trimmed as GradientPresetInput);
   }
 
   let parsed: unknown;
