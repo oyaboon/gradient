@@ -106,7 +106,7 @@ export function GeneratorView() {
   const getSnippetPayload = useCallback(
     (options: DeveloperExportOptions) => {
       const preset = buildPresetForExport();
-      const { selector, ...mountOptions } = options;
+      const { selector, mountMethod, ...mountOptions } = options;
       const filteredMountOptions = Object.fromEntries(
         Object.entries(mountOptions).filter(([, value]) => value != null)
       );
@@ -114,6 +114,7 @@ export function GeneratorView() {
       return {
         preset,
         selector,
+        mountMethod,
         mountOptions: filteredMountOptions,
       };
     },

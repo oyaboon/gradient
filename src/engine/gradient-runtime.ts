@@ -4,55 +4,25 @@ import { GradientRenderer } from "@/engine/renderer";
 import { normalizePreset } from "@/lib/preset";
 import type { GradientPreset } from "@/types/preset";
 import { resolveAutoMode, resolveMountOptions, shouldAnimate } from "./runtime-modes";
+import { mountSharedGradient } from "./shared-gradient-runtime";
 import type {
   GradientInstance,
   GradientMountMode,
   GradientMountOptions,
   GradientMountTarget,
+  GradientSharedInstance,
+  GradientSharedMountOptions,
+  GradientSharedMountTarget,
   ResolvedGradientMountOptions,
   RuntimeModeState,
 } from "./runtime-types";
-
-function resolveTarget(target: GradientMountTarget): HTMLElement {
-  if (typeof target === "string") {
-    const element = document.querySelector<HTMLElement>(target);
-    if (!element) {
-      throw new Error(`Gradient target "${target}" was not found.`);
-    }
-
-    return element;
-  }
-
-  return target;
-}
-
-function ensureContainerStyles(target: HTMLElement): void {
-  const computed = window.getComputedStyle(target);
-
-  if (computed.position === "static") {
-    target.style.position = "relative";
-  }
-
-  if (computed.overflow === "visible") {
-    target.style.overflow = "hidden";
-  }
-}
-
-function createLayer(target: HTMLElement): HTMLDivElement {
-  const layer = document.createElement("div");
-  layer.dataset.gradientLayer = "true";
-  layer.setAttribute("aria-hidden", "true");
-  layer.style.cssText = "position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:0;";
-  target.prepend(layer);
-  return layer;
-}
-
-function createCanvas(layer: HTMLElement): HTMLCanvasElement {
-  const canvas = document.createElement("canvas");
-  canvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none;";
-  layer.appendChild(canvas);
-  return canvas;
-}
+import {
+  createCanvas,
+  createLayer,
+  ensureContainerStyles,
+  readTargetSize,
+  resolveTarget,
+} from "./runtime-dom";
 
 function getRuntimeState(): RuntimeModeState {
   return {
@@ -64,15 +34,6 @@ function getRuntimeState(): RuntimeModeState {
         ? window.matchMedia("(prefers-reduced-motion: reduce)").matches
         : false,
     manuallyPaused: false,
-  };
-}
-
-function readTargetSize(target: HTMLElement): { width: number; height: number } {
-  const rect = target.getBoundingClientRect();
-
-  return {
-    width: Math.max(1, Math.round(rect.width || target.clientWidth || window.innerWidth)),
-    height: Math.max(1, Math.round(rect.height || target.clientHeight || window.innerHeight)),
   };
 }
 
@@ -94,7 +55,7 @@ export function mountGradient(
   initialOptions?: Partial<GradientMountOptions>
 ): GradientInstance {
   const target = resolveTarget(targetInput);
-  ensureContainerStyles(target);
+  const styleCleanup = ensureContainerStyles(target);
 
   const layer = createLayer(target);
   const canvas = createCanvas(layer);
@@ -277,10 +238,18 @@ export function mountGradient(
         }
       }
       layer.remove();
+      styleCleanup.restore();
     },
   };
 }
 
 export const Gradient = {
   mount: mountGradient,
+  mountShared(
+    targetInput: GradientSharedMountTarget,
+    presetInput: GradientPreset,
+    initialOptions?: Partial<GradientSharedMountOptions>
+  ): GradientSharedInstance {
+    return mountSharedGradient(targetInput, presetInput, initialOptions);
+  },
 };

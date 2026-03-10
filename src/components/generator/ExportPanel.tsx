@@ -8,7 +8,11 @@ import type {
   ExportTab,
   PngExportOptions,
 } from "@/types/export";
-import { DEVELOPER_MOUNT_MODES, EXPORT_TABS } from "@/types/export";
+import {
+  DEVELOPER_MOUNT_MODES,
+  DEVELOPER_RUNTIME_METHODS,
+  EXPORT_TABS,
+} from "@/types/export";
 
 const RUNTIME_DOWNLOAD_URL = "/api/gradient-runtime";
 const RUNTIME_FILENAME = "gradient-runtime.js";
@@ -49,12 +53,19 @@ export function ExportPanel({
   const [customWidth, setCustomWidth] = useState("1920");
   const [customHeight, setCustomHeight] = useState("1080");
   const [selector, setSelector] = useState(".gradient-runtime-target");
+  const [mountMethod, setMountMethod] = useState<DeveloperExportOptions["mountMethod"]>(
+    "mountShared"
+  );
   const [mode, setMode] = useState<DeveloperExportOptions["mode"]>("auto");
   const [resolutionScale, setResolutionScale] = useState("");
   const [fpsCap, setFpsCap] = useState("");
   const [flowMapSize, setFlowMapSize] = useState("");
   const [flowFps, setFlowFps] = useState("");
   const [maxRenderPixels, setMaxRenderPixels] = useState("");
+  const [copyStrategy, setCopyStrategy] = useState<"auto" | "2d" | "bitmaprenderer">("auto");
+  const [maxActiveSlots, setMaxActiveSlots] = useState("");
+  const [onlyVisibleSlots, setOnlyVisibleSlots] = useState(true);
+  const [updateTargetsOnMutation, setUpdateTargetsOnMutation] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -114,6 +125,7 @@ export function ExportPanel({
 
     return {
       selector: trimmedSelector,
+      mountMethod,
       mode,
       resolutionScale: parseOptionalNumber(resolutionScale),
       fpsCap:
@@ -123,6 +135,10 @@ export function ExportPanel({
       flowMapSize: parseOptionalNumber(flowMapSize),
       flowFps: parseOptionalNumber(flowFps),
       maxRenderPixels: parseOptionalNumber(maxRenderPixels),
+      copyStrategy,
+      maxActiveSlots: parseOptionalNumber(maxActiveSlots),
+      onlyVisibleSlots,
+      updateTargetsOnMutation,
     };
   };
 
@@ -154,6 +170,26 @@ export function ExportPanel({
           <p className="text-xs leading-5 text-white/60">
             Download the shared runtime once, then mount presets with short snippets.
           </p>
+          <div className="space-y-2">
+            <span className="block text-xs text-white/70">Runtime method</span>
+            <div className="space-y-2">
+              {DEVELOPER_RUNTIME_METHODS.map((method) => (
+                <button
+                  key={method.value}
+                  type="button"
+                  onClick={() => setMountMethod(method.value)}
+                  className={`w-full rounded-lg border px-3 py-2 text-left transition-colors ${
+                    mountMethod === method.value
+                      ? "border-white/50 bg-white/10"
+                      : "border-white/10 bg-black/10 hover:border-white/30"
+                  }`}
+                >
+                  <div className="text-sm text-white">{method.label}</div>
+                  <div className="text-[11px] text-white/55">{method.description}</div>
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="space-y-1">
             <label className="block text-xs text-white/70" htmlFor="developer-selector">
               Target selector
@@ -259,6 +295,53 @@ export function ExportPanel({
               onChange={(e) => setMaxRenderPixels(e.target.value)}
               placeholder="Use runtime default"
               className="w-full rounded-lg border border-white/15 bg-black/20 px-3 py-2 text-sm text-white outline-none transition-colors focus:border-white/40"
+            />
+          </label>
+
+          <div className="grid grid-cols-2 gap-2">
+            <label className="space-y-1">
+              <span className="block text-xs text-white/70">Copy strategy</span>
+              <select
+                value={copyStrategy}
+                onChange={(e) =>
+                  setCopyStrategy(e.target.value as "auto" | "2d" | "bitmaprenderer")
+                }
+                className="w-full rounded-lg border border-white/15 bg-black/20 px-3 py-2 text-sm text-white outline-none transition-colors focus:border-white/40"
+              >
+                <option value="auto">auto</option>
+                <option value="2d">2d</option>
+                <option value="bitmaprenderer">bitmaprenderer</option>
+              </select>
+            </label>
+            <label className="space-y-1">
+              <span className="block text-xs text-white/70">Max active slots</span>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={1}
+                value={maxActiveSlots}
+                onChange={(e) => setMaxActiveSlots(e.target.value)}
+                placeholder="Unlimited"
+                className="w-full rounded-lg border border-white/15 bg-black/20 px-3 py-2 text-sm text-white outline-none transition-colors focus:border-white/40"
+              />
+            </label>
+          </div>
+
+          <label className="flex items-center justify-between rounded-lg border border-white/10 bg-black/10 px-3 py-2 text-sm text-white">
+            <span>Present only visible slots</span>
+            <input
+              type="checkbox"
+              checked={onlyVisibleSlots}
+              onChange={(e) => setOnlyVisibleSlots(e.target.checked)}
+            />
+          </label>
+
+          <label className="flex items-center justify-between rounded-lg border border-white/10 bg-black/10 px-3 py-2 text-sm text-white">
+            <span>Auto-rescan selector mutations</span>
+            <input
+              type="checkbox"
+              checked={updateTargetsOnMutation}
+              onChange={(e) => setUpdateTargetsOnMutation(e.target.checked)}
             />
           </label>
 

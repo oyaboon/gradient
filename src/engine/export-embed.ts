@@ -124,6 +124,56 @@ export function generateRuntimeJavascript(): string {
     };
   }
 
+  function resolveSharedMountOptions(preset, userOptions) {
+    var base = resolveMountOptions(preset, userOptions);
+    var options = userOptions || {};
+    return Object.assign({}, base, {
+      copyStrategy: options.copyStrategy || "auto",
+      updateTargetsOnMutation: options.updateTargetsOnMutation === true,
+      selectorRoot: options.selectorRoot || document,
+      onlyVisibleSlots: options.onlyVisibleSlots !== false,
+      maxActiveSlots:
+        options.maxActiveSlots != null && isFinite(options.maxActiveSlots)
+          ? Math.max(1, Math.round(options.maxActiveSlots))
+          : Infinity
+    });
+  }
+
+  function resolveTargetList(targetInput, selectorRoot) {
+    if (typeof targetInput === "string") {
+      var root = selectorRoot && typeof selectorRoot.querySelectorAll === "function"
+        ? selectorRoot
+        : document;
+      return Array.prototype.slice.call(root.querySelectorAll(targetInput)).filter(function(node) {
+        return node && node.nodeType === 1;
+      });
+    }
+
+    if (targetInput && targetInput.nodeType === 1) {
+      return [targetInput];
+    }
+
+    if (!targetInput) {
+      return [];
+    }
+
+    try {
+      return Array.prototype.slice.call(targetInput).filter(function(node) {
+        return node && node.nodeType === 1;
+      });
+    } catch (_error) {
+      return [];
+    }
+  }
+
+  function readElementSize(target) {
+    var rect = target.getBoundingClientRect();
+    return {
+      width: Math.max(1, Math.round(rect.width || target.clientWidth || window.innerWidth)),
+      height: Math.max(1, Math.round(rect.height || target.clientHeight || window.innerHeight))
+    };
+  }
+
   function mountGradient(targetInput, rawPreset, userOptions) {
     var target = resolveTarget(targetInput);
     if (!target) throw new Error("Gradient target was not found.");
@@ -512,7 +562,376 @@ export function generateRuntimeJavascript(): string {
     };
   }
 
-  window.Gradient = { mount: mountGradient };
+  function mountSharedGradient(targetInput, rawPreset, userOptions) {
+    var preset = normalizePreset(rawPreset);
+    var options = resolveSharedMountOptions(preset, userOptions);
+    var selector = typeof targetInput === "string" ? targetInput : null;
+    var hiddenHost = document.createElement("div");
+    hiddenHost.setAttribute("aria-hidden", "true");
+    hiddenHost.style.cssText =
+      "position:fixed;left:-99999px;top:0;width:1px;height:1px;pointer-events:none;opacity:0;";
+    document.body.appendChild(hiddenHost);
+
+    var sourceOptions = Object.assign({}, options, {
+      mode: "animated",
+      pauseWhenHidden: false,
+      pauseWhenOffscreen: false,
+      respectReducedMotion: false
+    });
+    var sourceInstance = mountGradient(hiddenHost, preset, sourceOptions);
+    var sourceCanvas = hiddenHost.querySelector("canvas");
+    var slots = new Map();
+    var resizeObservers = new Map();
+    var intersectionObservers = new Map();
+    var mutationObserver = null;
+    var mediaQuery =
+      typeof window.matchMedia === "function"
+        ? window.matchMedia("(prefers-reduced-motion: reduce)")
+        : null;
+    var manuallyPaused = false;
+    var destroyed = false;
+    var rafId = null;
+    var lastFrameTimeMs = 0;
+
+    function ensureSlot(target) {
+      if (slots.has(target)) return slots.get(target);
+      ensureMountStyles(target);
+      var layer = createLayer(target);
+      var canvas = createCanvas(layer);
+      var ctx = canvas.getContext("2d");
+      var size = readElementSize(target);
+      var slot = {
+        target: target,
+        layer: layer,
+        canvas: canvas,
+        ctx: ctx,
+        width: size.width,
+        height: size.height,
+        hovered: false,
+        focused: false,
+        inView: true,
+        pointerEnter: function() {
+          slot.hovered = true;
+          syncLoopState(true);
+        },
+        pointerLeave: function() {
+          slot.hovered = false;
+          syncLoopState(false);
+        },
+        focusIn: function() {
+          slot.focused = true;
+          syncLoopState(true);
+        },
+        focusOut: function() {
+          slot.focused = false;
+          syncLoopState(false);
+        }
+      };
+      slots.set(target, slot);
+      var resizeObserver =
+        typeof ResizeObserver !== "undefined"
+          ? new ResizeObserver(function() {
+              var nextSize = readElementSize(target);
+              slot.width = nextSize.width;
+              slot.height = nextSize.height;
+              syncLoopState(true);
+            })
+          : null;
+      if (resizeObserver) resizeObserver.observe(target);
+      resizeObservers.set(target, resizeObserver);
+      var intersectionObserver =
+        typeof IntersectionObserver !== "undefined"
+          ? new IntersectionObserver(function(entries) {
+              slot.inView = !!(entries[0] && entries[0].isIntersecting);
+              syncLoopState(false);
+            }, { threshold: 0.01 })
+          : null;
+      if (intersectionObserver) intersectionObserver.observe(target);
+      intersectionObservers.set(target, intersectionObserver);
+      return slot;
+    }
+
+    function destroySlot(target) {
+      var slot = slots.get(target);
+      if (!slot) return;
+      target.removeEventListener("pointerenter", slot.pointerEnter);
+      target.removeEventListener("pointerleave", slot.pointerLeave);
+      target.removeEventListener("focusin", slot.focusIn);
+      target.removeEventListener("focusout", slot.focusOut);
+      var resizeObserver = resizeObservers.get(target);
+      if (resizeObserver) resizeObserver.disconnect();
+      resizeObservers.delete(target);
+      var intersectionObserver = intersectionObservers.get(target);
+      if (intersectionObserver) intersectionObserver.disconnect();
+      intersectionObservers.delete(target);
+      slot.layer.remove();
+      slots.delete(target);
+    }
+
+    function getSlotList() {
+      return Array.from(slots.values()).filter(function(slot) {
+        return slot.target && slot.target.isConnected;
+      });
+    }
+
+    function syncSlotListeners(effectiveMode) {
+      getSlotList().forEach(function(slot) {
+        slot.target.removeEventListener("pointerenter", slot.pointerEnter);
+        slot.target.removeEventListener("pointerleave", slot.pointerLeave);
+        slot.target.removeEventListener("focusin", slot.focusIn);
+        slot.target.removeEventListener("focusout", slot.focusOut);
+        if (effectiveMode === "hover") {
+          slot.target.addEventListener("pointerenter", slot.pointerEnter);
+          slot.target.addEventListener("pointerleave", slot.pointerLeave);
+          slot.target.addEventListener("focusin", slot.focusIn);
+          slot.target.addEventListener("focusout", slot.focusOut);
+        } else {
+          slot.hovered = false;
+          slot.focused = false;
+        }
+      });
+    }
+
+    function syncTargets() {
+      var nextTargets = resolveTargetList(targetInput, options.selectorRoot);
+      var nextSet = new Set(nextTargets);
+      slots.forEach(function(_slot, target) {
+        if (!nextSet.has(target)) destroySlot(target);
+      });
+      nextTargets.forEach(function(target) {
+        ensureSlot(target);
+      });
+      if (selector && slots.size === 0) {
+        console.warn('Gradient shared target "' + selector + '" was not found.');
+      }
+    }
+
+    function getEffectiveMode() {
+      if (options.mode !== "auto") return options.mode;
+      var largestArea = 0;
+      var largest = { width: 1, height: 1 };
+      getSlotList().forEach(function(slot) {
+        var area = slot.width * slot.height;
+        if (area > largestArea) {
+          largestArea = area;
+          largest = { width: slot.width, height: slot.height };
+        }
+      });
+      return chooseAutoMode(largest.width, largest.height);
+    }
+
+    function getSourceSize(slotsToMeasure) {
+      var list = slotsToMeasure && slotsToMeasure.length ? slotsToMeasure : getSlotList();
+      var maxWidth = 1;
+      var maxHeight = 1;
+      list.forEach(function(slot) {
+        maxWidth = Math.max(maxWidth, Math.ceil(slot.width / 64) * 64);
+        maxHeight = Math.max(maxHeight, Math.ceil(slot.height / 64) * 64);
+      });
+      return { width: maxWidth, height: maxHeight };
+    }
+
+    function getDisplaySlots() {
+      var allSlots = getSlotList();
+      var visibleSlots = options.onlyVisibleSlots
+        ? allSlots.filter(function(slot) { return slot.inView; })
+        : allSlots;
+      var preferred = visibleSlots.length ? visibleSlots : allSlots;
+      return isFinite(options.maxActiveSlots)
+        ? preferred.slice(0, options.maxActiveSlots)
+        : preferred;
+    }
+
+    function shouldAnimateGroup(effectiveMode) {
+      var slotList = getSlotList();
+      if (!slotList.length || manuallyPaused) return false;
+      var prefersReducedMotion = mediaQuery ? mediaQuery.matches : false;
+      if (options.respectReducedMotion && prefersReducedMotion) return false;
+      if (options.pauseWhenHidden && document.hidden) return false;
+      if (effectiveMode === "static") return false;
+      var anyInView = slotList.some(function(slot) { return slot.inView; });
+      if ((effectiveMode === "inView" || options.pauseWhenOffscreen) && !anyInView) return false;
+      if (effectiveMode === "hover") {
+        return slotList.some(function(slot) { return slot.hovered || slot.focused; });
+      }
+      return true;
+    }
+
+    function resizeSourceHost() {
+      var sourceSize = getSourceSize(getDisplaySlots());
+      hiddenHost.style.width = sourceSize.width + "px";
+      hiddenHost.style.height = sourceSize.height + "px";
+      sourceInstance.resize();
+      sourceCanvas = hiddenHost.querySelector("canvas");
+    }
+
+    function presentToSlots() {
+      if (!sourceCanvas) return;
+      getDisplaySlots().forEach(function(slot) {
+        var dpr = Math.min(window.devicePixelRatio || 1, 2);
+        var width = Math.max(1, Math.round(slot.width * dpr));
+        var height = Math.max(1, Math.round(slot.height * dpr));
+        if (slot.canvas.width !== width || slot.canvas.height !== height) {
+          slot.canvas.width = width;
+          slot.canvas.height = height;
+        }
+        if (!slot.ctx) return;
+        slot.ctx.clearRect(0, 0, width, height);
+        slot.ctx.drawImage(sourceCanvas, 0, 0, width, height);
+      });
+    }
+
+    function stopPresentLoop() {
+      if (rafId != null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+    }
+
+    function tick(now) {
+      if (destroyed) return;
+      var effectiveMode = getEffectiveMode();
+      if (!shouldAnimateGroup(effectiveMode)) {
+        sourceInstance.pause();
+        stopPresentLoop();
+        return;
+      }
+      rafId = requestAnimationFrame(tick);
+      if ((now - lastFrameTimeMs) < (1000 / options.fpsCap)) {
+        return;
+      }
+      lastFrameTimeMs = now;
+      presentToSlots();
+    }
+
+    function syncLoopState(forceRender) {
+      if (destroyed) return;
+      syncTargets();
+      resizeSourceHost();
+      var effectiveMode = getEffectiveMode();
+      syncSlotListeners(effectiveMode);
+      if (shouldAnimateGroup(effectiveMode)) {
+        sourceInstance.resume();
+        if (forceRender) {
+          sourceInstance.renderStill();
+          presentToSlots();
+        }
+        if (rafId == null) {
+          lastFrameTimeMs = 0;
+          rafId = requestAnimationFrame(tick);
+        }
+        return;
+      }
+      sourceInstance.pause();
+      stopPresentLoop();
+      if (forceRender || !document.hidden) {
+        sourceInstance.renderStill();
+        presentToSlots();
+      }
+    }
+
+    function handleVisibilityChange() {
+      syncLoopState(false);
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    if (mediaQuery) {
+      if (typeof mediaQuery.addEventListener === "function") {
+        mediaQuery.addEventListener("change", handleVisibilityChange);
+      } else if (typeof mediaQuery.addListener === "function") {
+        mediaQuery.addListener(handleVisibilityChange);
+      }
+    }
+
+    if (selector && options.updateTargetsOnMutation && typeof MutationObserver !== "undefined") {
+      var observedTarget =
+        options.selectorRoot === document
+          ? document.documentElement
+          : options.selectorRoot;
+      if (observedTarget) {
+        mutationObserver = new MutationObserver(function() {
+          syncLoopState(true);
+        });
+        mutationObserver.observe(observedTarget, {
+          childList: true,
+          subtree: true
+        });
+      }
+    }
+
+    syncLoopState(true);
+
+    return {
+      updatePreset: function(nextPreset) {
+        preset = normalizePreset(nextPreset);
+        options = resolveSharedMountOptions(preset, options);
+        sourceOptions = Object.assign({}, options, {
+          mode: "animated",
+          pauseWhenHidden: false,
+          pauseWhenOffscreen: false,
+          respectReducedMotion: false
+        });
+        sourceInstance.updatePreset(preset);
+        sourceInstance.updateOptions(sourceOptions);
+        syncLoopState(true);
+      },
+      updateOptions: function(nextOptions) {
+        options = resolveSharedMountOptions(preset, Object.assign({}, options, nextOptions || {}));
+        sourceOptions = Object.assign({}, options, {
+          mode: "animated",
+          pauseWhenHidden: false,
+          pauseWhenOffscreen: false,
+          respectReducedMotion: false
+        });
+        sourceInstance.updateOptions(sourceOptions);
+        syncLoopState(true);
+      },
+      rescan: function() {
+        syncLoopState(true);
+      },
+      resize: function() {
+        syncTargets();
+        getSlotList().forEach(function(slot) {
+          var size = readElementSize(slot.target);
+          slot.width = size.width;
+          slot.height = size.height;
+        });
+        syncLoopState(true);
+      },
+      renderStill: function() {
+        sourceInstance.renderStill();
+        presentToSlots();
+      },
+      pause: function() {
+        manuallyPaused = true;
+        syncLoopState(false);
+      },
+      resume: function() {
+        manuallyPaused = false;
+        syncLoopState(true);
+      },
+      destroy: function() {
+        destroyed = true;
+        stopPresentLoop();
+        mutationObserver && mutationObserver.disconnect();
+        document.removeEventListener("visibilitychange", handleVisibilityChange);
+        if (mediaQuery) {
+          if (typeof mediaQuery.removeEventListener === "function") {
+            mediaQuery.removeEventListener("change", handleVisibilityChange);
+          } else if (typeof mediaQuery.removeListener === "function") {
+            mediaQuery.removeListener(handleVisibilityChange);
+          }
+        }
+        slots.forEach(function(_slot, target) {
+          destroySlot(target);
+        });
+        sourceInstance.destroy();
+        hiddenHost.remove();
+      }
+    };
+  }
+
+  window.Gradient = { mount: mountGradient, mountShared: mountSharedGradient };
 })();
 `;
 

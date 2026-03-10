@@ -17,6 +17,7 @@ import {
 } from "./uniforms";
 
 const QUAD_POSITIONS = new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]);
+type RendererCanvas = HTMLCanvasElement | OffscreenCanvas;
 
 export interface RendererConfig {
   resolutionScale: number;
@@ -173,7 +174,7 @@ export class GradientRenderer {
   }
 
   static create(
-    canvas: HTMLCanvasElement,
+    canvas: RendererCanvas,
     config: Partial<RendererConfig> = {}
   ): GradientRenderer {
     const gl = canvas.getContext("webgl2", {
@@ -257,7 +258,7 @@ export class GradientRenderer {
     this.displayWidth = width;
     this.displayHeight = height;
 
-    const canvas = gl.canvas as HTMLCanvasElement;
+    const canvas = gl.canvas as RendererCanvas;
     if (canvas.width !== w || canvas.height !== h) {
       canvas.width = w;
       canvas.height = h;
@@ -280,7 +281,7 @@ export class GradientRenderer {
   draw(params: GradientParams, options?: { forceFlowUpdate?: boolean }): void {
     if (this.destroyed) return;
     const gl = this.gl;
-    const canvas = gl.canvas as HTMLCanvasElement;
+    const canvas = gl.canvas as RendererCanvas;
     const canvasW = canvas.width;
     const canvasH = canvas.height;
     const dpr = window.devicePixelRatio || 1;
@@ -353,6 +354,11 @@ export class GradientRenderer {
   getCurrentTime(): number {
     const nowMs = typeof performance !== "undefined" ? performance.now() : 0;
     return nowMs / 1000 - this.startTime;
+  }
+
+  setTimeOffsetSeconds(timeOffsetSeconds = 0): void {
+    const nowSec = (typeof performance !== "undefined" ? performance.now() : 0) / 1000;
+    this.startTime = nowSec - timeOffsetSeconds;
   }
 
   startLoop(
@@ -431,8 +437,8 @@ export class GradientRenderer {
     return dataUrl;
   }
 
-  getCanvas(): HTMLCanvasElement {
-    return this.gl.canvas as HTMLCanvasElement;
+  getCanvas(): RendererCanvas {
+    return this.gl.canvas as RendererCanvas;
   }
 
   destroy(): void {

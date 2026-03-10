@@ -3,9 +3,12 @@
 import { getPresetQualityDefaults } from "@/lib/preset";
 import type { GradientPreset } from "@/types/preset";
 import type {
+  BaseGradientMountOptions,
   GradientMountMode,
   GradientMountOptions,
+  GradientSharedMountOptions,
   ResolvedGradientMountOptions,
+  ResolvedGradientSharedMountOptions,
   RuntimeModeState,
 } from "./runtime-types";
 
@@ -53,9 +56,9 @@ export function resolveAutoMode(width: number, height: number): GradientMountMod
   return "animated";
 }
 
-export function resolveMountOptions(
+function resolveBaseMountOptions<TOptions extends BaseGradientMountOptions>(
   preset: GradientPreset,
-  options?: Partial<GradientMountOptions>
+  options?: Partial<TOptions>
 ): ResolvedGradientMountOptions {
   const presetQuality = getPresetQualityDefaults(preset);
   const presetMaxRenderPixels = preset.exportDefaults?.quality?.maxRenderPixels;
@@ -80,6 +83,29 @@ export function resolveMountOptions(
     respectReducedMotion: options?.respectReducedMotion ?? true,
     pauseWhenHidden: options?.pauseWhenHidden ?? true,
     pauseWhenOffscreen: options?.pauseWhenOffscreen ?? true,
+  };
+}
+
+export function resolveMountOptions(
+  preset: GradientPreset,
+  options?: Partial<GradientMountOptions>
+): ResolvedGradientMountOptions {
+  return resolveBaseMountOptions(preset, options);
+}
+
+export function resolveSharedMountOptions(
+  preset: GradientPreset,
+  options?: Partial<GradientSharedMountOptions>
+): ResolvedGradientSharedMountOptions {
+  const baseOptions = resolveBaseMountOptions(preset, options);
+
+  return {
+    ...baseOptions,
+    copyStrategy: options?.copyStrategy ?? "auto",
+    updateTargetsOnMutation: options?.updateTargetsOnMutation ?? false,
+    selectorRoot: options?.selectorRoot ?? document,
+    onlyVisibleSlots: options?.onlyVisibleSlots ?? true,
+    maxActiveSlots: Math.max(1, Math.round(options?.maxActiveSlots ?? Number.POSITIVE_INFINITY)),
   };
 }
 
