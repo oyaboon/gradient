@@ -29,3 +29,13 @@ body {
 .radix-scrollbar[data-state="hidden"] {
   animation: scrollbarFadeOut 200ms ease-out forwards;
 }
+
+/* Hide number input spinners so they don't clash with dark theme */
+input[type="number"].no-spinner::-webkit-inner-spin-button,
+input[type="number"].no-spinner::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"].no-spinner {
+  -moz-appearance: textfield;
+}

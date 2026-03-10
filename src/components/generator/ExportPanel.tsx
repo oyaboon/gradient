@@ -11,6 +11,7 @@ const RUNTIME_DOWNLOAD_URL = "/api/gradient-runtime";
 interface ExportPanelProps {
   onDownloadWallpaperEngine: () => void;
   onDownloadPng: (options: PngExportOptions) => void;
+  onCopyPngToClipboard: (options: PngExportOptions) => void | Promise<void>;
   onCopyPresetJson: () => void | Promise<void>;
   onDownloadPresetJson: () => void;
   onImportPresetJson: (file: File) => void;
@@ -27,6 +28,7 @@ const MAX_CUSTOM_PNG_SIZE = 8192;
 export function ExportPanel({
   onDownloadWallpaperEngine,
   onDownloadPng,
+  onCopyPngToClipboard,
   onCopyPresetJson,
   onDownloadPresetJson,
   onImportPresetJson,
@@ -176,7 +178,7 @@ export function ExportPanel({
                   max={MAX_CUSTOM_PNG_SIZE}
                   value={customWidth}
                   onChange={(e) => setCustomWidth(e.target.value)}
-                  className="w-full rounded-lg border border-white/15 bg-black/20 px-3 py-2 text-sm text-white outline-none transition-colors focus:border-white/40"
+                  className="no-spinner w-full rounded-lg border border-white/15 bg-black/20 px-3 py-2 text-sm text-white outline-none transition-colors focus:border-white/40"
                 />
               </label>
               <label className="space-y-1">
@@ -188,7 +190,7 @@ export function ExportPanel({
                   max={MAX_CUSTOM_PNG_SIZE}
                   value={customHeight}
                   onChange={(e) => setCustomHeight(e.target.value)}
-                  className="w-full rounded-lg border border-white/15 bg-black/20 px-3 py-2 text-sm text-white outline-none transition-colors focus:border-white/40"
+                  className="no-spinner w-full rounded-lg border border-white/15 bg-black/20 px-3 py-2 text-sm text-white outline-none transition-colors focus:border-white/40"
                 />
               </label>
             </div>
@@ -196,15 +198,26 @@ export function ExportPanel({
 
           {pngError && <p className="text-[11px] text-amber-300">{pngError}</p>}
 
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => resolvedPngOptions && onDownloadPng(resolvedPngOptions)}
-            disabled={resolvedPngOptions == null}
-            className="w-full"
-          >
-            Download PNG
-          </Button>
+          <div className="grid gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => resolvedPngOptions && onCopyPngToClipboard(resolvedPngOptions)}
+              disabled={resolvedPngOptions == null}
+              className="w-full"
+            >
+              Copy to Figma
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => resolvedPngOptions && onDownloadPng(resolvedPngOptions)}
+              disabled={resolvedPngOptions == null}
+              className="w-full"
+            >
+              Download PNG
+            </Button>
+          </div>
         </div>
       )}
 

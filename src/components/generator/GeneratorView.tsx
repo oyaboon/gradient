@@ -130,6 +130,29 @@ export function GeneratorView() {
     }
   }, [params, activePreset, showToast]);
 
+  const handleCopyPngToClipboard = useCallback(
+    async (options: PngExportOptions) => {
+      const renderer = rendererRef.current;
+      if (!renderer) {
+        showToast("Canvas not ready");
+        return;
+      }
+      try {
+        const { width, height } = options;
+        const dataUrl = capturePngAsDataUrl(renderer, params, width, height);
+        const res = await fetch(dataUrl);
+        const blob = await res.blob();
+        await navigator.clipboard.write([
+          new ClipboardItem({ "image/png": blob }),
+        ]);
+        showToast("Copied to clipboard — paste in Figma");
+      } catch {
+        showToast("Copy failed");
+      }
+    },
+    [params, showToast]
+  );
+
   const handleCopyPresetJson = useCallback(async () => {
     try {
       const preset = buildPresetForExport();
@@ -229,6 +252,7 @@ export function GeneratorView() {
           <ExportPanel
             onDownloadWallpaperEngine={handleDownloadWallpaperEngine}
             onDownloadPng={handleDownloadPng}
+            onCopyPngToClipboard={handleCopyPngToClipboard}
             onCopyPresetJson={handleCopyPresetJson}
             onDownloadPresetJson={handleDownloadPresetJson}
             onImportPresetJson={handleImportPresetJson}
