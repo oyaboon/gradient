@@ -6,6 +6,7 @@ import type {
   BaseGradientMountOptions,
   GradientMountMode,
   GradientMountOptions,
+  GradientSharedMode,
   GradientSharedMountOptions,
   ResolvedGradientMountOptions,
   ResolvedGradientSharedMountOptions,
@@ -13,6 +14,12 @@ import type {
 } from "./runtime-types";
 
 const DEFAULT_MAX_RENDER_PIXELS = 3_500_000;
+
+type InternalBaseMountOptions = BaseGradientMountOptions & {
+  respectReducedMotion?: boolean;
+  pauseWhenHidden?: boolean;
+  pauseWhenOffscreen?: boolean;
+};
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -42,21 +49,7 @@ function quantizeFlowFps(flowFps: number): number {
   return 15;
 }
 
-export function resolveAutoMode(width: number, height: number): GradientMountMode {
-  const area = Math.max(1, width) * Math.max(1, height);
-
-  if (area <= 140_000) {
-    return "static";
-  }
-
-  if (area <= 700_000) {
-    return "inView";
-  }
-
-  return "animated";
-}
-
-function resolveBaseMountOptions<TOptions extends BaseGradientMountOptions>(
+function resolveBaseMountOptions<TOptions extends InternalBaseMountOptions>(
   preset: GradientPreset,
   options?: Partial<TOptions>
 ): ResolvedGradientMountOptions {
@@ -64,7 +57,7 @@ function resolveBaseMountOptions<TOptions extends BaseGradientMountOptions>(
   const presetMaxRenderPixels = preset.exportDefaults?.quality?.maxRenderPixels;
 
   return {
-    mode: options?.mode ?? "auto",
+    mode: "animated",
     resolutionScale: clamp(
       options?.resolutionScale ?? presetQuality.qualityResolutionScale,
       0.5,
@@ -90,7 +83,11 @@ export function resolveMountOptions(
   preset: GradientPreset,
   options?: Partial<GradientMountOptions>
 ): ResolvedGradientMountOptions {
-  return resolveBaseMountOptions(preset, options);
+  const baseOptions = resolveBaseMountOptions(preset, options);
+  return {
+    ...baseOptions,
+    mode: options?.mode ?? "animated",
+  };
 }
 
 export function resolveSharedMountOptions(
@@ -101,16 +98,13 @@ export function resolveSharedMountOptions(
 
   return {
     ...baseOptions,
-    copyStrategy: options?.copyStrategy ?? "auto",
-    updateTargetsOnMutation: options?.updateTargetsOnMutation ?? false,
-    selectorRoot: options?.selectorRoot ?? document,
-    onlyVisibleSlots: options?.onlyVisibleSlots ?? true,
-    maxActiveSlots: Math.max(1, Math.round(options?.maxActiveSlots ?? Number.POSITIVE_INFINITY)),
+    mode: (options?.mode ?? "animated") as GradientSharedMode,
+    frameTransport: options?.frameTransport ?? "auto",
   };
 }
 
 export function shouldAnimate(
-  mode: GradientMountMode,
+  mode: GradientMountMode | GradientSharedMode,
   state: RuntimeModeState,
   options: ResolvedGradientMountOptions
 ): boolean {
@@ -130,7 +124,7 @@ export function shouldAnimate(
     return false;
   }
 
-  if ((mode === "inView" || options.pauseWhenOffscreen) && !state.inView) {
+  if (options.pauseWhenOffscreen && !state.inView) {
     return false;
   }
 

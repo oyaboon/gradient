@@ -1,0 +1,7 @@
+export const RUNTIME_GLOBAL_FILENAME = "gradient-runtime.global.js";
+export const RUNTIME_ESM_FILENAME = "gradient-runtime.esm.js";
+export const RUNTIME_TYPES_FILENAME = "index.d.ts";
+export const RUNTIME_PUBLIC_DIRECTORY = "runtime";
+export const RUNTIME_GLOBAL_PUBLIC_PATH = `/${RUNTIME_PUBLIC_DIRECTORY}/${RUNTIME_GLOBAL_FILENAME}`;
+export const RUNTIME_ESM_PUBLIC_PATH = `/${RUNTIME_PUBLIC_DIRECTORY}/${RUNTIME_ESM_FILENAME}`;
+export const RUNTIME_TYPES_PUBLIC_PATH = `/${RUNTIME_PUBLIC_DIRECTORY}/${RUNTIME_TYPES_FILENAME}`;

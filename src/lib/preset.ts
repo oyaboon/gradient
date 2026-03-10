@@ -7,11 +7,13 @@ import {
   GRADIENT_ENGINE_ID,
   LEGACY_PRESET_VERSION,
   PRESET_VERSION,
+  type GradientPresetInput,
   type GradientParams,
   type GradientPreset,
   type LegacyPreset,
   type StorePresetQuality,
 } from "@/types/preset";
+import { decodeCompactPreset, isCompactPresetString } from "./compact-preset";
 
 export interface GradientPresetStoreSnapshot extends StorePresetQuality {
   params: GradientParams;
@@ -311,7 +313,17 @@ function normalizeLegacyPreset(source: Record<string, unknown>): GradientPreset 
   };
 }
 
-export function normalizePreset(rawPreset: unknown): GradientPreset {
+export function normalizePreset(rawPreset: GradientPresetInput): GradientPreset {
+  /**
+   * Runtime accepts either the canonical/readable preset object or a compact `g1:` string.
+   * Compact input is decoded back into the canonical shape before normal validation runs.
+   */
+  if (isCompactPresetString(rawPreset)) {
+    return normalizeCanonicalPreset(
+      decodeCompactPreset(rawPreset) as unknown as Record<string, unknown>
+    );
+  }
+
   if (!isRecord(rawPreset)) {
     throw new Error("Preset JSON must be an object.");
   }
@@ -324,6 +336,11 @@ export function normalizePreset(rawPreset: unknown): GradientPreset {
 }
 
 export function parsePresetJson(raw: string): GradientPreset {
+  const trimmed = raw.trim();
+  if (isCompactPresetString(trimmed)) {
+    return normalizePreset(trimmed);
+  }
+
   let parsed: unknown;
 
   try {
@@ -332,7 +349,7 @@ export function parsePresetJson(raw: string): GradientPreset {
     throw new Error("Invalid preset JSON syntax.");
   }
 
-  return normalizePreset(parsed);
+  return normalizePreset(parsed as GradientPresetInput);
 }
 
 export function buildPresetFromStore(state: GradientPresetStoreSnapshot): GradientPreset {

@@ -2,12 +2,11 @@
 
 import { GradientRenderer } from "@/engine/renderer";
 import { normalizePreset } from "@/lib/preset";
-import type { GradientPreset } from "@/types/preset";
-import { resolveAutoMode, resolveMountOptions, shouldAnimate } from "./runtime-modes";
+import type { GradientPresetInput } from "@/types/preset";
+import { resolveMountOptions, shouldAnimate } from "./runtime-modes";
 import { mountSharedGradient } from "./shared-gradient-runtime";
 import type {
   GradientInstance,
-  GradientMountMode,
   GradientMountOptions,
   GradientMountTarget,
   GradientSharedInstance,
@@ -37,21 +36,13 @@ function getRuntimeState(): RuntimeModeState {
   };
 }
 
-function getEffectiveMode(
-  target: HTMLElement,
-  options: ResolvedGradientMountOptions
-): GradientMountMode {
-  if (options.mode !== "auto") {
-    return options.mode;
-  }
-
-  const { width, height } = readTargetSize(target);
-  return resolveAutoMode(width, height);
-}
-
+/**
+ * Mount a dedicated renderer into one target element.
+ * Quality overrides are resolved in this order: user options, preset export defaults, runtime fallbacks.
+ */
 export function mountGradient(
   targetInput: GradientMountTarget,
-  presetInput: GradientPreset,
+  presetInput: GradientPresetInput,
   initialOptions?: Partial<GradientMountOptions>
 ): GradientInstance {
   const target = resolveTarget(targetInput);
@@ -96,12 +87,13 @@ export function mountGradient(
   };
 
   const syncHoverListeners = () => {
-    const effectiveMode = getEffectiveMode(target, options);
-    const needsHoverListeners = effectiveMode === "hover";
+    const needsHoverListeners = options.mode === "hover";
 
     if (needsHoverListeners && !hoverListenersAttached) {
       target.addEventListener("pointerenter", handlePointerEnter);
       target.addEventListener("pointerleave", handlePointerLeave);
+      target.addEventListener("focusin", handleFocusIn);
+      target.addEventListener("focusout", handleFocusOut);
       hoverListenersAttached = true;
       return;
     }
@@ -109,9 +101,11 @@ export function mountGradient(
     if (!needsHoverListeners && hoverListenersAttached) {
       target.removeEventListener("pointerenter", handlePointerEnter);
       target.removeEventListener("pointerleave", handlePointerLeave);
+      target.removeEventListener("focusin", handleFocusIn);
+      target.removeEventListener("focusout", handleFocusOut);
       hoverListenersAttached = false;
       state.hovered = false;
-    }
+     }
   };
 
   const syncLoopState = () => {
@@ -122,17 +116,16 @@ export function mountGradient(
     applyRendererConfig();
     syncHoverListeners();
 
-    const effectiveMode = getEffectiveMode(target, options);
-    const animate = shouldAnimate(effectiveMode, state, options);
+    const animate = shouldAnimate(options.mode, state, options);
 
-    if (!animate && effectiveMode === "hover") {
+    if (!animate && options.mode === "hover") {
       lastAnimationTimeSeconds = renderer.getCurrentTime();
     }
     renderer.stop();
 
     if (animate) {
       renderer.start(() => preset.params, {
-        timeOffsetSeconds: effectiveMode === "hover" ? lastAnimationTimeSeconds : undefined,
+        timeOffsetSeconds: options.mode === "hover" ? lastAnimationTimeSeconds : undefined,
       });
       return;
     }
@@ -150,6 +143,16 @@ export function mountGradient(
   }
 
   function handlePointerLeave() {
+    state = { ...state, hovered: false };
+    syncLoopState();
+  }
+
+  function handleFocusIn() {
+    state = { ...state, hovered: true };
+    syncLoopState();
+  }
+
+  function handleFocusOut() {
     state = { ...state, hovered: false };
     syncLoopState();
   }
@@ -215,7 +218,10 @@ export function mountGradient(
       state = { ...state, manuallyPaused: false };
       syncLoopState();
     },
-    destroy() {
+      /**
+       * Disconnect observers, remove listeners, and release the WebGL renderer.
+       */
+      destroy() {
       if (destroyed) {
         return;
       }
@@ -229,6 +235,8 @@ export function mountGradient(
       if (hoverListenersAttached) {
         target.removeEventListener("pointerenter", handlePointerEnter);
         target.removeEventListener("pointerleave", handlePointerLeave);
+        target.removeEventListener("focusin", handleFocusIn);
+        target.removeEventListener("focusout", handleFocusOut);
       }
       if (mediaQuery) {
         if (typeof mediaQuery.removeEventListener === "function") {
@@ -247,7 +255,7 @@ export const Gradient = {
   mount: mountGradient,
   mountShared(
     targetInput: GradientSharedMountTarget,
-    presetInput: GradientPreset,
+    presetInput: GradientPresetInput,
     initialOptions?: Partial<GradientSharedMountOptions>
   ): GradientSharedInstance {
     return mountSharedGradient(targetInput, presetInput, initialOptions);

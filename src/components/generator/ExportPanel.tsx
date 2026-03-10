@@ -5,17 +5,13 @@ import { Button } from "@/components/ui/Button";
 import { PNG_SIZES } from "@/engine/export-png";
 import type {
   DeveloperExportOptions,
+  DeveloperPresetFormat,
   ExportTab,
   PngExportOptions,
 } from "@/types/export";
-import {
-  DEVELOPER_MOUNT_MODES,
-  DEVELOPER_RUNTIME_METHODS,
-  EXPORT_TABS,
-} from "@/types/export";
+import { DEVELOPER_PRESET_FORMATS, EXPORT_TABS } from "@/types/export";
 
 const RUNTIME_DOWNLOAD_URL = "/api/gradient-runtime";
-const RUNTIME_FILENAME = "gradient-runtime.js";
 
 interface ExportPanelProps {
   onDownloadWallpaperEngine: () => void;
@@ -23,12 +19,9 @@ interface ExportPanelProps {
   onCopyPresetJson: () => void | Promise<void>;
   onDownloadPresetJson: () => void;
   onImportPresetJson: (file: File) => void;
-  /** When set, "Download runtime JS" uses this URL (same-origin) so the browser won't block as insecure. */
   runtimeDownloadUrl?: string;
-  onDownloadRuntimeJs: () => void;
-  onCopyMountSnippet: (options: DeveloperExportOptions) => void | Promise<void>;
-  onCopyHtmlExample: (options: DeveloperExportOptions) => void | Promise<void>;
-  onCopyReactExample: (options: DeveloperExportOptions) => void | Promise<void>;
+  runtimeFilename?: string;
+  onCopySnippet: (options: DeveloperExportOptions) => void | Promise<void>;
 }
 
 type PngSizeMode = "hd" | "uhd" | "custom";
@@ -42,30 +35,15 @@ export function ExportPanel({
   onDownloadPresetJson,
   onImportPresetJson,
   runtimeDownloadUrl = RUNTIME_DOWNLOAD_URL,
-  onDownloadRuntimeJs,
-  onCopyMountSnippet,
-  onCopyHtmlExample,
-  onCopyReactExample,
+  runtimeFilename = "gradient-runtime.global.js",
+  onCopySnippet,
 }: ExportPanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState<ExportTab>("developer");
   const [pngSizeMode, setPngSizeMode] = useState<PngSizeMode>("hd");
   const [customWidth, setCustomWidth] = useState("1920");
   const [customHeight, setCustomHeight] = useState("1080");
-  const [selector, setSelector] = useState(".gradient-runtime-target");
-  const [mountMethod, setMountMethod] = useState<DeveloperExportOptions["mountMethod"]>(
-    "mountShared"
-  );
-  const [mode, setMode] = useState<DeveloperExportOptions["mode"]>("auto");
-  const [resolutionScale, setResolutionScale] = useState("");
-  const [fpsCap, setFpsCap] = useState("");
-  const [flowMapSize, setFlowMapSize] = useState("");
-  const [flowFps, setFlowFps] = useState("");
-  const [maxRenderPixels, setMaxRenderPixels] = useState("");
-  const [copyStrategy, setCopyStrategy] = useState<"auto" | "2d" | "bitmaprenderer">("auto");
-  const [maxActiveSlots, setMaxActiveSlots] = useState("");
-  const [onlyVisibleSlots, setOnlyVisibleSlots] = useState(true);
-  const [updateTargetsOnMutation, setUpdateTargetsOnMutation] = useState(false);
+  const [presetFormat, setPresetFormat] = useState<DeveloperPresetFormat>("readable");
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -104,43 +82,10 @@ export function ExportPanel({
     pngSizeMode === "custom" && resolvedPngOptions == null
       ? `Use values from 64 to ${MAX_CUSTOM_PNG_SIZE}px.`
       : null;
-  const selectorError = !selector.trim() ? "Selector is required for runtime snippets." : null;
 
-  const buildDeveloperOptions = (): DeveloperExportOptions | null => {
-    const trimmedSelector = selector.trim();
-    if (!trimmedSelector) {
-      return null;
-    }
-
-    const parseOptionalNumber = (value: string): number | undefined => {
-      if (!value.trim()) {
-        return undefined;
-      }
-
-      const parsed = Number(value);
-      return Number.isFinite(parsed) ? parsed : undefined;
-    };
-
-    const parsedFpsCap = parseOptionalNumber(fpsCap);
-
-    return {
-      selector: trimmedSelector,
-      mountMethod,
-      mode,
-      resolutionScale: parseOptionalNumber(resolutionScale),
-      fpsCap:
-        parsedFpsCap === 30 || parsedFpsCap === 60
-          ? (parsedFpsCap as 30 | 60)
-          : undefined,
-      flowMapSize: parseOptionalNumber(flowMapSize),
-      flowFps: parseOptionalNumber(flowFps),
-      maxRenderPixels: parseOptionalNumber(maxRenderPixels),
-      copyStrategy,
-      maxActiveSlots: parseOptionalNumber(maxActiveSlots),
-      onlyVisibleSlots,
-      updateTargetsOnMutation,
-    };
-  };
+  const buildDeveloperOptions = (): DeveloperExportOptions => ({
+    presetFormat,
+  });
 
   const tabButtonClass = (isActive: boolean) =>
     `rounded-md px-3 py-2 text-xs font-medium transition-colors ${
@@ -168,237 +113,44 @@ export function ExportPanel({
       {activeTab === "developer" && (
         <div className="space-y-3">
           <p className="text-xs leading-5 text-white/60">
-            Download the shared runtime once, then mount presets with short snippets.
+            Download the runtime once, then paste a minimal snippet with either a readable
+            preset object or a compact `g1:` string.
           </p>
           <div className="space-y-2">
-            <span className="block text-xs text-white/70">Runtime method</span>
+            <span className="block text-xs text-white/70">Preset format</span>
             <div className="space-y-2">
-              {DEVELOPER_RUNTIME_METHODS.map((method) => (
+              {DEVELOPER_PRESET_FORMATS.map((format) => (
                 <button
-                  key={method.value}
+                  key={format.value}
                   type="button"
-                  onClick={() => setMountMethod(method.value)}
+                  onClick={() => setPresetFormat(format.value)}
                   className={`w-full rounded-lg border px-3 py-2 text-left transition-colors ${
-                    mountMethod === method.value
+                    presetFormat === format.value
                       ? "border-white/50 bg-white/10"
                       : "border-white/10 bg-black/10 hover:border-white/30"
                   }`}
                 >
-                  <div className="text-sm text-white">{method.label}</div>
-                  <div className="text-[11px] text-white/55">{method.description}</div>
+                  <div className="text-sm text-white">{format.label}</div>
+                  <div className="text-[11px] text-white/55">{format.description}</div>
                 </button>
               ))}
             </div>
           </div>
-          <div className="space-y-1">
-            <label className="block text-xs text-white/70" htmlFor="developer-selector">
-              Target selector
-            </label>
-            <input
-              id="developer-selector"
-              type="text"
-              value={selector}
-              onChange={(e) => setSelector(e.target.value)}
-              placeholder=".hero-gradient"
-              className="w-full rounded-lg border border-white/15 bg-black/20 px-3 py-2 text-sm text-white outline-none transition-colors focus:border-white/40"
-            />
-            {selectorError && <p className="text-[11px] text-amber-300">{selectorError}</p>}
-          </div>
-
-          <div className="space-y-2">
-            <span className="block text-xs text-white/70">Runtime mode</span>
-            <div className="space-y-2">
-              {DEVELOPER_MOUNT_MODES.map((modeOption) => (
-                <button
-                  key={modeOption.value}
-                  type="button"
-                  onClick={() => setMode(modeOption.value)}
-                  className={`w-full rounded-lg border px-3 py-2 text-left transition-colors ${
-                    mode === modeOption.value
-                      ? "border-white/50 bg-white/10"
-                      : "border-white/10 bg-black/10 hover:border-white/30"
-                  }`}
-                >
-                  <div className="text-sm text-white">{modeOption.label}</div>
-                  <div className="text-[11px] text-white/55">{modeOption.description}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <label className="space-y-1">
-              <span className="block text-xs text-white/70">Resolution scale</span>
-              <input
-                type="number"
-                inputMode="decimal"
-                step="0.05"
-                min={0.5}
-                max={1}
-                value={resolutionScale}
-                onChange={(e) => setResolutionScale(e.target.value)}
-                placeholder="Use preset default"
-                className="w-full rounded-lg border border-white/15 bg-black/20 px-3 py-2 text-sm text-white outline-none transition-colors focus:border-white/40"
-              />
-            </label>
-            <label className="space-y-1">
-              <span className="block text-xs text-white/70">FPS cap</span>
-              <input
-                type="number"
-                inputMode="numeric"
-                step="30"
-                min={30}
-                max={60}
-                value={fpsCap}
-                onChange={(e) => setFpsCap(e.target.value)}
-                placeholder="30 or 60"
-                className="w-full rounded-lg border border-white/15 bg-black/20 px-3 py-2 text-sm text-white outline-none transition-colors focus:border-white/40"
-              />
-            </label>
-            <label className="space-y-1">
-              <span className="block text-xs text-white/70">Flow map size</span>
-              <input
-                type="number"
-                inputMode="numeric"
-                min={256}
-                max={512}
-                step="64"
-                value={flowMapSize}
-                onChange={(e) => setFlowMapSize(e.target.value)}
-                placeholder="256 / 384 / 512"
-                className="w-full rounded-lg border border-white/15 bg-black/20 px-3 py-2 text-sm text-white outline-none transition-colors focus:border-white/40"
-              />
-            </label>
-            <label className="space-y-1">
-              <span className="block text-xs text-white/70">Flow FPS</span>
-              <input
-                type="number"
-                inputMode="numeric"
-                min={15}
-                max={60}
-                step="15"
-                value={flowFps}
-                onChange={(e) => setFlowFps(e.target.value)}
-                placeholder="15 / 30 / 60"
-                className="w-full rounded-lg border border-white/15 bg-black/20 px-3 py-2 text-sm text-white outline-none transition-colors focus:border-white/40"
-              />
-            </label>
-          </div>
-
-          <label className="space-y-1">
-            <span className="block text-xs text-white/70">Max render pixels</span>
-            <input
-              type="number"
-              inputMode="numeric"
-              min={250000}
-              value={maxRenderPixels}
-              onChange={(e) => setMaxRenderPixels(e.target.value)}
-              placeholder="Use runtime default"
-              className="w-full rounded-lg border border-white/15 bg-black/20 px-3 py-2 text-sm text-white outline-none transition-colors focus:border-white/40"
-            />
-          </label>
-
-          <div className="grid grid-cols-2 gap-2">
-            <label className="space-y-1">
-              <span className="block text-xs text-white/70">Copy strategy</span>
-              <select
-                value={copyStrategy}
-                onChange={(e) =>
-                  setCopyStrategy(e.target.value as "auto" | "2d" | "bitmaprenderer")
-                }
-                className="w-full rounded-lg border border-white/15 bg-black/20 px-3 py-2 text-sm text-white outline-none transition-colors focus:border-white/40"
-              >
-                <option value="auto">auto</option>
-                <option value="2d">2d</option>
-                <option value="bitmaprenderer">bitmaprenderer</option>
-              </select>
-            </label>
-            <label className="space-y-1">
-              <span className="block text-xs text-white/70">Max active slots</span>
-              <input
-                type="number"
-                inputMode="numeric"
-                min={1}
-                value={maxActiveSlots}
-                onChange={(e) => setMaxActiveSlots(e.target.value)}
-                placeholder="Unlimited"
-                className="w-full rounded-lg border border-white/15 bg-black/20 px-3 py-2 text-sm text-white outline-none transition-colors focus:border-white/40"
-              />
-            </label>
-          </div>
-
-          <label className="flex items-center justify-between rounded-lg border border-white/10 bg-black/10 px-3 py-2 text-sm text-white">
-            <span>Present only visible slots</span>
-            <input
-              type="checkbox"
-              checked={onlyVisibleSlots}
-              onChange={(e) => setOnlyVisibleSlots(e.target.checked)}
-            />
-          </label>
-
-          <label className="flex items-center justify-between rounded-lg border border-white/10 bg-black/10 px-3 py-2 text-sm text-white">
-            <span>Auto-rescan selector mutations</span>
-            <input
-              type="checkbox"
-              checked={updateTargetsOnMutation}
-              onChange={(e) => setUpdateTargetsOnMutation(e.target.checked)}
-            />
-          </label>
-
           <div className="grid gap-2">
-            {runtimeDownloadUrl ? (
-              <a
-                href={runtimeDownloadUrl}
-                download={RUNTIME_FILENAME}
-                className="font-display font-medium rounded-lg transition-colors px-4 py-2 text-sm w-full text-center bg-transparent text-white border border-white/40 hover:border-white/70 hover:bg-white/5"
-              >
-                Download runtime JS
-              </a>
-            ) : (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={onDownloadRuntimeJs}
-                className="w-full"
-              >
-                Download runtime JS
-              </Button>
-            )}
+            <a
+              href={runtimeDownloadUrl}
+              download={runtimeFilename}
+              className="font-display font-medium rounded-lg transition-colors px-4 py-2 text-sm w-full text-center bg-transparent text-white border border-white/40 hover:border-white/70 hover:bg-white/5"
+            >
+              Download Runtime JS
+            </a>
             <Button
               variant="secondary"
               size="sm"
-              onClick={() => {
-                const options = buildDeveloperOptions();
-                if (options) onCopyMountSnippet(options);
-              }}
-              disabled={Boolean(selectorError)}
+              onClick={() => onCopySnippet(buildDeveloperOptions())}
               className="w-full"
             >
-              Copy mount snippet
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => {
-                const options = buildDeveloperOptions();
-                if (options) onCopyHtmlExample(options);
-              }}
-              disabled={Boolean(selectorError)}
-              className="w-full"
-            >
-              Copy HTML example
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => {
-                const options = buildDeveloperOptions();
-                if (options) onCopyReactExample(options);
-              }}
-              disabled={Boolean(selectorError)}
-              className="w-full"
-            >
-              Copy React example
+              Copy Snippet
             </Button>
           </div>
         </div>

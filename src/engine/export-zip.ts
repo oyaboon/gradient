@@ -3,7 +3,7 @@
  */
 
 import JSZip from "jszip";
-import { generateRuntimeJavascript, RUNTIME_FILENAME } from "./export-embed";
+import { fetchRuntimeJavascript, RUNTIME_FILENAME } from "./export-embed";
 import type { GradientPreset } from "@/types/preset";
 import { getPresetName } from "@/lib/preset";
 
@@ -47,9 +47,10 @@ export async function createGradientZip(
   _fallbackDataUrl?: string | null
 ): Promise<Blob> {
   const zip = new JSZip();
+  const runtimeJavascript = await fetchRuntimeJavascript();
 
   zip.file("index.html", createHtmlDocument(preset, RUNTIME_FILENAME));
-  zip.file(RUNTIME_FILENAME, generateRuntimeJavascript());
+  zip.file(RUNTIME_FILENAME, runtimeJavascript);
   zip.file("preset.json", JSON.stringify(preset, null, 2));
 
   return zip.generateAsync({ type: "blob" });
@@ -65,6 +66,7 @@ export async function createWallpaperEngineZip(
   _fallbackDataUrl?: string | null
 ): Promise<Blob> {
   const zip = new JSZip();
+  const runtimeJavascript = await fetchRuntimeJavascript();
   const title = getPresetName(preset);
   const projectJson = {
     file: "index.html",
@@ -73,23 +75,10 @@ export async function createWallpaperEngineZip(
     general: { properties: {} },
   };
 
-  const readme = `Wallpaper Engine - Web Wallpaper
-===============================
-
-1. Extract this folder somewhere (e.g. Desktop).
-2. Open Wallpaper Engine.
-3. Click "Create Wallpaper" and choose "Create wallpaper from file".
-4. Select the "index.html" file from this folder.
-
-All files (HTML, JS, images) are bundled locally; no internet required.
-Docs: https://docs.wallpaperengine.io/en/web/first/gettingstarted.html
-`;
-
   zip.file("index.html", createHtmlDocument(preset, RUNTIME_FILENAME, { mode: "animated" }));
-  zip.file(RUNTIME_FILENAME, generateRuntimeJavascript());
+  zip.file(RUNTIME_FILENAME, runtimeJavascript);
   zip.file("preset.json", JSON.stringify(preset, null, 2));
   zip.file("project.json", JSON.stringify(projectJson, null, 2));
-  zip.file("README.txt", readme);
 
   return zip.generateAsync({ type: "blob" });
 }

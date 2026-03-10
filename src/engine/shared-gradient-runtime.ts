@@ -2,11 +2,11 @@
 
 import { GradientRenderer } from "@/engine/renderer";
 import { normalizePreset } from "@/lib/preset";
-import type { GradientPreset } from "@/types/preset";
-import { resolveAutoMode, resolveSharedMountOptions, shouldAnimate } from "./runtime-modes";
+import type { GradientPresetInput } from "@/types/preset";
+import { resolveSharedMountOptions, shouldAnimate } from "./runtime-modes";
 import type {
-  GradientCopyStrategy,
-  GradientMountMode,
+  GradientFrameTransport,
+  GradientSharedMode,
   GradientSharedInstance,
   GradientSharedMountOptions,
   GradientSharedMountTarget,
@@ -38,14 +38,7 @@ interface SharedSlot {
   bitmapRenderer: ImageBitmapRenderingContext | null;
   width: number;
   height: number;
-  hovered: boolean;
-  focused: boolean;
   inView: boolean;
-  hoverListenersAttached: boolean;
-  handlePointerEnter: () => void;
-  handlePointerLeave: () => void;
-  handleFocusIn: () => void;
-  handleFocusOut: () => void;
   styleCleanup: { restore(): void };
   resizeObserver: ResizeObserver | null;
   intersectionObserver: IntersectionObserver | null;
@@ -70,19 +63,13 @@ function normalizeElements(elements: Iterable<Element> | ArrayLike<Element>): HT
 }
 
 function resolveSharedTargets(
-  targetInput: GradientSharedMountTarget,
-  options: ResolvedGradientSharedMountOptions
+  targetInput: GradientSharedMountTarget
 ): ResolvedTargets {
   if (typeof targetInput === "string") {
-    const root = options.selectorRoot as ParentNode & {
-      querySelectorAll?: (selectors: string) => NodeListOf<Element>;
+    return {
+      elements: normalizeElements(document.querySelectorAll(targetInput)),
+      selector: targetInput,
     };
-    const elements =
-      typeof root.querySelectorAll === "function"
-        ? normalizeElements(root.querySelectorAll(targetInput))
-        : [];
-
-    return { elements, selector: targetInput };
   }
 
   if (targetInput instanceof HTMLElement) {
@@ -97,11 +84,10 @@ function resolveSharedTargets(
 }
 
 function getGroupState(manuallyPaused: boolean, slots: SharedSlot[]): RuntimeModeState {
-  const hovered = slots.some((slot) => slot.hovered || slot.focused);
   const inView = slots.some((slot) => slot.inView);
 
   return {
-    hovered,
+    hovered: false,
     inView,
     visible: !document.hidden,
     reducedMotion:
@@ -112,6 +98,10 @@ function getGroupState(manuallyPaused: boolean, slots: SharedSlot[]): RuntimeMod
   };
 }
 
+/**
+ * Shared rendering prefers OffscreenCanvas, but falls back to a hidden DOM canvas
+ * so the runtime keeps working in browsers without OffscreenCanvas support.
+ */
 function createSharedSource(): SharedSource {
   if (typeof OffscreenCanvas !== "undefined") {
     const canvas = new OffscreenCanvas(1, 1);
@@ -168,14 +158,7 @@ function createSlot(target: HTMLElement): SharedSlot {
     bitmapRenderer: null,
     width: size.width,
     height: size.height,
-    hovered: false,
-    focused: false,
     inView: true,
-    hoverListenersAttached: false,
-    handlePointerEnter: () => {},
-    handlePointerLeave: () => {},
-    handleFocusIn: () => {},
-    handleFocusOut: () => {},
     styleCleanup,
     resizeObserver: null,
     intersectionObserver: null,
@@ -186,35 +169,8 @@ function createSlot(target: HTMLElement): SharedSlot {
 function destroySlot(slot: SharedSlot): void {
   slot.resizeObserver?.disconnect();
   slot.intersectionObserver?.disconnect();
-  slot.target.removeEventListener("pointerenter", slot.handlePointerEnter);
-  slot.target.removeEventListener("pointerleave", slot.handlePointerLeave);
-  slot.target.removeEventListener("focusin", slot.handleFocusIn);
-  slot.target.removeEventListener("focusout", slot.handleFocusOut);
   slot.layer.remove();
   slot.styleCleanup.restore();
-}
-
-function syncSlotInteractionListeners(slot: SharedSlot, mode: GradientMountMode): void {
-  const needsHoverListeners = mode === "hover";
-
-  if (needsHoverListeners && !slot.hoverListenersAttached) {
-    slot.target.addEventListener("pointerenter", slot.handlePointerEnter);
-    slot.target.addEventListener("pointerleave", slot.handlePointerLeave);
-    slot.target.addEventListener("focusin", slot.handleFocusIn);
-    slot.target.addEventListener("focusout", slot.handleFocusOut);
-    slot.hoverListenersAttached = true;
-    return;
-  }
-
-  if (!needsHoverListeners && slot.hoverListenersAttached) {
-    slot.target.removeEventListener("pointerenter", slot.handlePointerEnter);
-    slot.target.removeEventListener("pointerleave", slot.handlePointerLeave);
-    slot.target.removeEventListener("focusin", slot.handleFocusIn);
-    slot.target.removeEventListener("focusout", slot.handleFocusOut);
-    slot.hoverListenersAttached = false;
-    slot.hovered = false;
-    slot.focused = false;
-  }
 }
 
 function ensureSlotCanvasMode(slot: SharedSlot, mode: SlotPresentationMode): void {
@@ -251,8 +207,12 @@ function resizeSlotCanvas(slot: SharedSlot): void {
   }
 }
 
-function resolveCopyStrategy(
-  strategy: GradientCopyStrategy,
+/**
+ * `bitmaprenderer` can only safely own a single ImageBitmap at a time,
+ * so multi-slot presentation falls back to the 2D path.
+ */
+function resolveFrameTransport(
+  strategy: GradientFrameTransport,
   source: SharedSource,
   slots: SharedSlot[]
 ): SlotPresentationMode {
@@ -267,9 +227,12 @@ function resolveCopyStrategy(
   return "2d";
 }
 
+/**
+ * Mount one shared source renderer and present frames into many target slots.
+ */
 export function mountSharedGradient(
   targetInput: GradientSharedMountTarget,
-  presetInput: GradientPreset,
+  presetInput: GradientPresetInput,
   initialOptions?: Partial<GradientSharedMountOptions>
 ): GradientSharedInstance {
   const source = createSharedSource();
@@ -280,7 +243,7 @@ export function mountSharedGradient(
 
   let preset = normalizePreset(presetInput);
   let options = resolveSharedMountOptions(preset, initialOptions);
-  let currentTargets = resolveSharedTargets(targetInput, options);
+  let currentTargets = resolveSharedTargets(targetInput);
   const slots = new Map<HTMLElement, SharedSlot>();
   let destroyed = false;
   let manuallyPaused = false;
@@ -303,26 +266,7 @@ export function mountSharedGradient(
 
   const getSlots = (): SharedSlot[] => Array.from(slots.values()).filter((slot) => slot.target.isConnected);
 
-  const getEffectiveMode = (): GradientMountMode => {
-    if (options.mode !== "auto") {
-      return options.mode;
-    }
-
-    const measuredSlots = getSlots();
-    const largestSlot =
-      measuredSlots.reduce(
-        (largest, slot) => {
-          if (slot.width * slot.height > largest.width * largest.height) {
-            return { width: slot.width, height: slot.height };
-          }
-
-          return largest;
-        },
-        { width: 0, height: 0 }
-      ) || { width: 0, height: 0 };
-
-    return resolveAutoMode(Math.max(1, largestSlot.width), Math.max(1, largestSlot.height));
-  };
+  const getEffectiveMode = (): GradientSharedMode => options.mode;
 
   const computeSourceSize = (candidateSlots: SharedSlot[]): { width: number; height: number } => {
     const measuredSlots = candidateSlots.length > 0 ? candidateSlots : getSlots();
@@ -381,16 +325,9 @@ export function mountSharedGradient(
       return connectedSlots;
     }
 
-    const visibleSlots = options.onlyVisibleSlots
-      ? connectedSlots.filter((slot) => slot.inView)
-      : connectedSlots;
+    const visibleSlots = connectedSlots.filter((slot) => slot.inView);
     const preferredSlots = visibleSlots.length > 0 ? visibleSlots : connectedSlots;
-
-    if (!Number.isFinite(options.maxActiveSlots)) {
-      return preferredSlots;
-    }
-
-    return preferredSlots.slice(0, options.maxActiveSlots);
+    return preferredSlots;
   };
 
   const renderToSlots = (displaySlots: SharedSlot[]) => {
@@ -398,7 +335,7 @@ export function mountSharedGradient(
       return;
     }
 
-    const desiredMode = resolveCopyStrategy(options.copyStrategy, source, displaySlots);
+    const desiredMode = resolveFrameTransport(options.frameTransport, source, displaySlots);
 
     for (const slot of displaySlots) {
       ensureSlotCanvasMode(slot, desiredMode);
@@ -459,7 +396,7 @@ export function mountSharedGradient(
     }
   };
 
-  const shouldLoop = (mode: GradientMountMode) => {
+  const shouldLoop = (mode: GradientSharedMode) => {
     const activeSlots = getSlots();
     if (activeSlots.length === 0) {
       return false;
@@ -528,25 +465,6 @@ export function mountSharedGradient(
       }
 
       const slot = createSlot(element);
-      slot.handlePointerEnter = () => {
-        slot.hovered = true;
-        pendingRender = true;
-        scheduleRefresh();
-      };
-      slot.handlePointerLeave = () => {
-        slot.hovered = false;
-        scheduleRefresh();
-      };
-      slot.handleFocusIn = () => {
-        slot.focused = true;
-        pendingRender = true;
-        scheduleRefresh();
-      };
-      slot.handleFocusOut = () => {
-        slot.focused = false;
-        scheduleRefresh();
-      };
-
       if (typeof ResizeObserver !== "undefined") {
         slot.resizeObserver = new ResizeObserver(() => {
           const size = readTargetSize(slot.target);
@@ -574,7 +492,7 @@ export function mountSharedGradient(
   };
 
   const syncTargets = () => {
-    currentTargets = resolveSharedTargets(targetInput, options);
+    currentTargets = resolveSharedTargets(targetInput);
     removeMissingSlots(currentTargets.elements);
     addNewSlots(currentTargets.elements);
 
@@ -588,31 +506,6 @@ export function mountSharedGradient(
   };
 
   const syncMutationObserver = () => {
-    if (currentTargets.selector && options.updateTargetsOnMutation && typeof MutationObserver !== "undefined") {
-      if (mutationObserver) {
-        return;
-      }
-
-      const rootNode = options.selectorRoot;
-      const observedTarget =
-        rootNode instanceof Document ? rootNode.documentElement : rootNode;
-
-      if (!observedTarget) {
-        return;
-      }
-
-      mutationObserver = new MutationObserver(() => {
-        pendingRender = true;
-        syncTargets();
-        scheduleRefresh();
-      });
-      mutationObserver.observe(observedTarget, {
-        childList: true,
-        subtree: true,
-      });
-      return;
-    }
-
     mutationObserver?.disconnect();
     mutationObserver = null;
   };
@@ -630,11 +523,6 @@ export function mountSharedGradient(
 
       syncTargets();
       const effectiveMode = getEffectiveMode();
-
-      for (const slot of slots.values()) {
-        syncSlotInteractionListeners(slot, effectiveMode);
-      }
-
       syncMutationObserver();
 
       if (shouldLoop(effectiveMode)) {
@@ -717,7 +605,10 @@ export function mountSharedGradient(
       pendingRender = true;
       scheduleRefresh();
     },
-    destroy() {
+      /**
+       * Tear down the shared renderer and every presentation slot in one pass.
+       */
+      destroy() {
       if (destroyed) {
         return;
       }

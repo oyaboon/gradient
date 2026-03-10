@@ -44,6 +44,9 @@ export interface GradientPreset {
   };
 }
 
+export type GradientPresetObjectInput = GradientPreset | LegacyPreset;
+export type GradientPresetInput = GradientPresetObjectInput | string;
+
 export interface LegacyPreset extends GradientParams {
   preset_version: typeof LEGACY_PRESET_VERSION;
   preset_name: string;

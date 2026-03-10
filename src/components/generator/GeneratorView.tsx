@@ -9,7 +9,6 @@ import { ExportPanel } from "./ExportPanel";
 import { ScrollArea } from "@/components/ui/ScrollArea";
 import type { GradientRenderer } from "@/engine/renderer";
 import type { DeveloperExportOptions, PngExportOptions } from "@/types/export";
-import { generateRuntimeJavascript, RUNTIME_FILENAME } from "@/engine/export-embed";
 import {
   capturePngAsDataUrl,
   downloadPng,
@@ -19,12 +18,14 @@ import {
   downloadZip,
 } from "@/engine/export-zip";
 import {
-  createHtmlExample,
   createMountSnippet,
-  createReactExample,
 } from "@/engine/runtime-snippets";
 import { buildPresetFromStore, getPresetName, parsePresetJson } from "@/lib/preset";
 import { useToastStore } from "@/store/useToastStore";
+import {
+  RUNTIME_GLOBAL_FILENAME,
+  RUNTIME_GLOBAL_PUBLIC_PATH,
+} from "@/runtime/runtime-artifacts";
 
 export function GeneratorView() {
   const params = useGradientStore((s) => s.params);
@@ -105,17 +106,9 @@ export function GeneratorView() {
 
   const getSnippetPayload = useCallback(
     (options: DeveloperExportOptions) => {
-      const preset = buildPresetForExport();
-      const { selector, mountMethod, ...mountOptions } = options;
-      const filteredMountOptions = Object.fromEntries(
-        Object.entries(mountOptions).filter(([, value]) => value != null)
-      );
-
       return {
-        preset,
-        selector,
-        mountMethod,
-        mountOptions: filteredMountOptions,
+        preset: buildPresetForExport(),
+        exportOptions: options,
       };
     },
     [buildPresetForExport]
@@ -193,56 +186,11 @@ export function GeneratorView() {
     [applyPreset, showToast]
   );
 
-  const handleDownloadRuntimeJs = useCallback(() => {
-    try {
-      downloadText(generateRuntimeJavascript(), RUNTIME_FILENAME, "text/javascript");
-      showToast("Runtime JS downloaded");
-    } catch {
-      showToast("Export failed");
-    }
-  }, [downloadText, showToast]);
-
-  const handleCopyMountSnippet = useCallback(
+  const handleCopySnippet = useCallback(
     async (options: DeveloperExportOptions) => {
       try {
         const payload = getSnippetPayload(options);
-        await copyText(
-          createMountSnippet(payload.preset, payload),
-          "Mount snippet copied"
-        );
-      } catch {
-        showToast("Copy failed");
-      }
-    },
-    [copyText, getSnippetPayload, showToast]
-  );
-
-  const handleCopyHtmlExample = useCallback(
-    async (options: DeveloperExportOptions) => {
-      try {
-        const payload = getSnippetPayload(options);
-        await copyText(
-          createHtmlExample(payload.preset, {
-            ...payload,
-            runtimeFilename: RUNTIME_FILENAME,
-          }),
-          "HTML example copied"
-        );
-      } catch {
-        showToast("Copy failed");
-      }
-    },
-    [copyText, getSnippetPayload, showToast]
-  );
-
-  const handleCopyReactExample = useCallback(
-    async (options: DeveloperExportOptions) => {
-      try {
-        const payload = getSnippetPayload(options);
-        await copyText(
-          createReactExample(payload.preset, payload),
-          "React example copied"
-        );
+        await copyText(createMountSnippet(payload.preset, payload), "Snippet copied");
       } catch {
         showToast("Copy failed");
       }
@@ -291,10 +239,9 @@ export function GeneratorView() {
             onCopyPresetJson={handleCopyPresetJson}
             onDownloadPresetJson={handleDownloadPresetJson}
             onImportPresetJson={handleImportPresetJson}
-            onDownloadRuntimeJs={handleDownloadRuntimeJs}
-            onCopyMountSnippet={handleCopyMountSnippet}
-            onCopyHtmlExample={handleCopyHtmlExample}
-            onCopyReactExample={handleCopyReactExample}
+            runtimeDownloadUrl={RUNTIME_GLOBAL_PUBLIC_PATH}
+            runtimeFilename={RUNTIME_GLOBAL_FILENAME}
+            onCopySnippet={handleCopySnippet}
           />
         </div>
       </ScrollArea>

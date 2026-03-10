@@ -1,9 +1,10 @@
 "use client";
 
-import type { GradientPreset } from "@/types/preset";
+import type { GradientPresetInput } from "@/types/preset";
 
-export type GradientMountMode = "auto" | "animated" | "static" | "hover" | "inView";
-export type GradientCopyStrategy = "auto" | "2d" | "bitmaprenderer";
+export type GradientMountMode = "animated" | "static" | "hover";
+export type GradientSharedMode = "animated" | "static";
+export type GradientFrameTransport = "auto" | "2d" | "bitmaprenderer";
 
 export type GradientMountTarget = string | HTMLElement;
 export type GradientSharedMountTarget =
@@ -13,39 +14,38 @@ export type GradientSharedMountTarget =
   | Iterable<Element>;
 
 export interface BaseGradientMountOptions {
-  mode?: GradientMountMode;
   resolutionScale?: number;
   fpsCap?: 30 | 60;
   flowMapSize?: number;
   flowFps?: number;
   maxRenderPixels?: number;
-  respectReducedMotion?: boolean;
-  pauseWhenHidden?: boolean;
-  pauseWhenOffscreen?: boolean;
 }
 
-export interface GradientMountOptions extends BaseGradientMountOptions {}
+export interface GradientMountOptions extends BaseGradientMountOptions {
+  mode?: GradientMountMode;
+}
 
 export interface GradientSharedMountOptions extends BaseGradientMountOptions {
-  copyStrategy?: GradientCopyStrategy;
-  updateTargetsOnMutation?: boolean;
-  selectorRoot?: ParentNode;
-  onlyVisibleSlots?: boolean;
-  maxActiveSlots?: number;
+  mode?: GradientSharedMode;
+  frameTransport?: GradientFrameTransport;
 }
 
 export interface ResolvedGradientMountOptions extends Required<GradientMountOptions> {
   mode: GradientMountMode;
+  respectReducedMotion: boolean;
+  pauseWhenHidden: boolean;
+  pauseWhenOffscreen: boolean;
 }
 
-export interface ResolvedGradientSharedMountOptions
-  extends Required<Omit<GradientSharedMountOptions, "selectorRoot">> {
-  mode: GradientMountMode;
-  selectorRoot: ParentNode;
+export interface ResolvedGradientSharedMountOptions extends Required<GradientSharedMountOptions> {
+  mode: GradientSharedMode;
+  respectReducedMotion: boolean;
+  pauseWhenHidden: boolean;
+  pauseWhenOffscreen: boolean;
 }
 
 export interface GradientRuntimeInstance<TOptions extends BaseGradientMountOptions> {
-  updatePreset(nextPreset: GradientPreset): void;
+  updatePreset(nextPreset: GradientPresetInput): void;
   updateOptions(nextOptions: Partial<TOptions>): void;
   resize(): void;
   renderStill(): void;

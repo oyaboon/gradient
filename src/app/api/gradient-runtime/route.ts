@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { generateRuntimeJavascript, RUNTIME_FILENAME } from "@/engine/export-embed";
+import { RUNTIME_FILENAME } from "@/engine/export-embed";
+import { readRuntimeGlobalArtifact } from "@/runtime/runtime-artifacts.server";
 
 /**
  * GET /api/gradient-runtime
@@ -7,7 +8,7 @@ import { generateRuntimeJavascript, RUNTIME_FILENAME } from "@/engine/export-emb
  * URL. This avoids "Insecure download blocked" when triggering download from blob.
  */
 export async function GET() {
-  const body = generateRuntimeJavascript();
+  const body = await readRuntimeGlobalArtifact();
 
   return new NextResponse(body, {
     status: 200,
