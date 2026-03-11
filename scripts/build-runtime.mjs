@@ -1,8 +1,10 @@
 import { mkdir, copyFile } from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
 
-const rootDir = process.cwd();
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const rootDir = path.resolve(__dirname, "..");
 const outDir = path.join(rootDir, "public", "runtime");
 
 async function buildRuntimeArtifacts() {

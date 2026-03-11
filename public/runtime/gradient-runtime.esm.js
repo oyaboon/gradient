@@ -1,4 +1,4 @@
-// src/engine/shaders.ts
+// ../../src/engine/shaders.ts
 var VERTEX_SOURCE = `#version 300 es
 in vec2 a_position;
 out vec2 v_uv;
@@ -174,7 +174,7 @@ void main() {
 }
 `;
 
-// src/engine/uniforms.ts
+// ../../src/engine/uniforms.ts
 function hexToRgb(hex) {
   const h = hex.replace(/^#/, "");
   const n = parseInt(h, 16);
@@ -261,7 +261,7 @@ function setCompositeUniforms(gl, loc, params, width, height, devicePixelRatio) 
   if (loc.uniform_grain_size) gl.uniform1f(loc.uniform_grain_size, params.uniform_grain_size);
 }
 
-// src/engine/renderer.ts
+// ../../src/engine/renderer.ts
 var QUAD_POSITIONS = new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]);
 var DEFAULT_CONFIG = {
   resolutionScale: 1,
@@ -578,7 +578,7 @@ var GradientRenderer = class _GradientRenderer {
   }
 };
 
-// src/types/preset.ts
+// ../../src/types/preset.ts
 var PRESET_VERSION = 1;
 var LEGACY_PRESET_VERSION = "1.0";
 var GRADIENT_ENGINE_ID = "grain-v1";
@@ -607,7 +607,7 @@ var DEFAULT_PRESET_QUALITY = {
   qualityFlowFps: 30
 };
 
-// src/lib/compact-preset.ts
+// ../../src/lib/compact-preset.ts
 var COMPACT_PRESET_PREFIX_G1 = "g1:";
 var COMPACT_PRESET_PREFIX_G2 = "g2:";
 var SCALE = 1e3;
@@ -748,7 +748,7 @@ function decodeCompactPreset(compactPreset) {
   throw new Error("Unsupported compact preset format.");
 }
 
-// src/lib/preset.ts
+// ../../src/lib/preset.ts
 function isRecord(value) {
   return typeof value === "object" && value !== null;
 }
@@ -1022,7 +1022,7 @@ function getPresetQualityDefaults(preset) {
   };
 }
 
-// src/engine/runtime-modes.ts
+// ../../src/engine/runtime-modes.ts
 var DEFAULT_MAX_RENDER_PIXELS = 35e5;
 function clamp3(value, min, max) {
   return Math.min(max, Math.max(min, value));
@@ -1110,7 +1110,7 @@ function shouldAnimate(mode, state, options) {
   return true;
 }
 
-// src/engine/runtime-dom.ts
+// ../../src/engine/runtime-dom.ts
 function restoreInlineStyle(style, property, previousValue) {
   if (previousValue) {
     style[property] = previousValue;
@@ -1173,7 +1173,7 @@ function readTargetSize(target) {
   };
 }
 
-// src/engine/shared-gradient-runtime.ts
+// ../../src/engine/shared-gradient-runtime.ts
 function isIterable(value) {
   return !!value && typeof value[Symbol.iterator] === "function";
 }
@@ -1640,7 +1640,7 @@ function mountSharedGradient(targetInput, presetInput, initialOptions) {
   };
 }
 
-// src/engine/gradient-runtime.ts
+// ../../src/engine/gradient-runtime.ts
 function getRuntimeState() {
   return {
     hovered: false,
