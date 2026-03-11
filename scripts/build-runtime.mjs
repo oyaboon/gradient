@@ -6,6 +6,9 @@ import { build } from "esbuild";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "..");
 const outDir = path.join(rootDir, "public", "runtime");
+const srcDir = path.join(rootDir, "src");
+
+const alias = { "@": srcDir };
 
 async function buildRuntimeArtifacts() {
   await mkdir(outDir, { recursive: true });
@@ -23,6 +26,7 @@ async function buildRuntimeArtifacts() {
       legalComments: "none",
       logLevel: "info",
       tsconfig: path.join(rootDir, "tsconfig.json"),
+      alias,
     }),
     build({
       entryPoints: [path.join(rootDir, "src", "builds", "esm.ts")],
@@ -36,10 +40,31 @@ async function buildRuntimeArtifacts() {
       legalComments: "none",
       logLevel: "info",
       tsconfig: path.join(rootDir, "tsconfig.json"),
+      alias,
+    }),
+    build({
+      entryPoints: [path.join(rootDir, "src", "builds", "react.tsx")],
+      bundle: true,
+      format: "esm",
+      platform: "browser",
+      target: "es2018",
+      outfile: path.join(outDir, "gradient-runtime.react.js"),
+      sourcemap: false,
+      minify: false,
+      legalComments: "none",
+      logLevel: "info",
+      tsconfig: path.join(rootDir, "tsconfig.json"),
+      alias,
+      jsx: "automatic",
+      external: ["react", "react-dom", "react/jsx-runtime"],
     }),
     copyFile(
       path.join(rootDir, "src", "builds", "index.d.ts"),
       path.join(outDir, "index.d.ts")
+    ),
+    copyFile(
+      path.join(rootDir, "src", "builds", "react.d.ts"),
+      path.join(outDir, "react.d.ts")
     ),
   ]);
 }

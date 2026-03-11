@@ -1,3 +1,6 @@
+// src/builds/GradientMount.tsx
+import { useEffect, useRef } from "react";
+
 // src/engine/shaders.ts
 var VERTEX_SOURCE = `#version 300 es
 in vec2 a_position;
@@ -1829,8 +1832,41 @@ var Gradient = {
     return mountSharedGradient(targetInput, presetInput, initialOptions);
   }
 };
+
+// src/builds/GradientMount.tsx
+import { jsx } from "react/jsx-runtime";
+function GradientMount({
+  preset,
+  options,
+  className,
+  style,
+  children
+}) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const instance = Gradient.mount(el, preset, {
+      mode: "hover",
+      resolutionScale: 0.75,
+      fpsCap: 60,
+      ...options
+    });
+    return () => instance.destroy();
+  }, [preset, options == null ? void 0 : options.mode, options == null ? void 0 : options.resolutionScale, options == null ? void 0 : options.fpsCap]);
+  return /* @__PURE__ */ jsx(
+    "div",
+    {
+      ref,
+      className,
+      style: { position: "relative", overflow: "hidden", ...style },
+      children: children != null ? /* @__PURE__ */ jsx("div", { style: { position: "relative", zIndex: 1 }, children }) : null
+    }
+  );
+}
 export {
   Gradient,
+  GradientMount,
   mountGradient,
   mountSharedGradient
 };

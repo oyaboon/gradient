@@ -1,6 +1,6 @@
 {
   "name": "gradient-runtime",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Standalone gradient animation runtime for the browser",
   "type": "module",
   "main": "./dist/gradient-runtime.esm.js",
@@ -14,11 +14,18 @@
     "./global": {
       "import": "./dist/gradient-runtime.global.js",
       "types": "./dist/index.d.ts"
+    },
+    "./react": {
+      "import": "./dist/gradient-runtime.react.js",
+      "types": "./dist/react.d.ts"
     }
   },
   "files": [
     "dist"
   ],
+  "peerDependencies": {
+    "react": ">=17.0.0"
+  },
   "scripts": {
     "build": "node ../../scripts/build-runtime.mjs && node copy-to-dist.mjs",
     "prepublishOnly": "npm run build"
