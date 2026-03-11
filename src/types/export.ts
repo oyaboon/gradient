@@ -11,9 +11,9 @@ export interface PngExportOptions {
 }
 
 export const EXPORT_TABS: Array<{ id: ExportTab; label: string }> = [
-  { id: "png", label: "PNG" },
-  { id: "preset", label: "Preset" },
   { id: "developer", label: "Developer" },
+  { id: "png", label: "Designer" },
+  { id: "preset", label: "Preset" },
   { id: "more", label: "More" },
 ];
 
