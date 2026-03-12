@@ -217,7 +217,8 @@ export function GeneratorView() {
   return (
     <div className="h-screen min-h-0 flex flex-col md:flex-row overflow-hidden">
       {/* Mobile: превью закреплено сверху, не скроллится. Desktop: canvas на всю высоту слева. */}
-      <div className="flex-shrink-0 h-[38vh] min-h-[200px] md:flex-1 md:min-h-screen md:h-auto relative overflow-hidden border-b border-white/10 md:border-b-0 md:border-r border-white/10">
+      {/* Desktop: превью занимает всё оставшееся место (не делится 50/50 с панелью). */}
+      <div className="flex-shrink-0 h-[38vh] min-h-[200px] md:flex-1 md:min-w-0 md:min-h-screen md:h-auto relative overflow-hidden border-b border-white/10 md:border-b-0 md:border-r border-white/10">
         <GradientCanvas
           params={params}
           config={{
@@ -232,9 +233,10 @@ export function GeneratorView() {
         />
       </div>
       {/* Mobile: панель настроек занимает остаток экрана и скроллится. Desktop: фиксированная колонка справа. */}
+      {/* Desktop: только фиксированная ширина, без flex-1 — иначе колонки делят экран пополам. */}
       <ScrollArea
         type="scroll"
-        className="flex-1 min-h-0 w-full md:w-96 lg:w-[28rem] md:flex-shrink-0 bg-neutral-950/95 border-white/10 md:border-l h-full md:h-screen"
+        className="flex-1 min-h-0 w-full flex-shrink-0 md:flex-none md:w-96 lg:w-[28rem] bg-neutral-950/95 border-white/10 md:border-l h-full md:h-screen"
       >
         <div className="p-4 space-y-6">
           <div className="flex items-center justify-between">
