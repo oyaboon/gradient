@@ -10,7 +10,9 @@ import { Hero } from "./Hero";
 import { Features } from "./Features";
 import { HowItWorks } from "./HowItWorks";
 import { PresetStrip } from "./PresetStrip";
+import { CodePreview } from "./CodePreview";
 import { Pricing } from "./Pricing";
+import { BottomLine } from "./BottomLine";
 import { ScrollArea } from "@/components/ui/ScrollArea";
 import type { GradientPreset } from "@/types/preset";
 
@@ -51,7 +53,6 @@ export function LandingView({
           onCtaClick={onPurchaseClick}
           onLicenseKeyClick={onOpenLicenseModal}
         />
-        <Features />
         <PresetStrip
           presets={demoPresets}
           activePresetName={activePreset?.name ?? null}
@@ -77,8 +78,14 @@ export function LandingView({
             );
           }}
         />
+        <Features />
+        <CodePreview />
         <HowItWorks />
-        <Pricing onPurchase={onPurchaseClick} />
+        <Pricing
+          onPurchase={onPurchaseClick}
+          onLicenseKeyClick={onOpenLicenseModal}
+        />
+        <BottomLine />
       </div>
     </ScrollArea>
   );

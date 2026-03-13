@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 
 interface HeroProps {
@@ -18,19 +19,27 @@ export function Hero({ onCtaClick, onLicenseKeyClick, background }: HeroProps) {
           gradient
         </h1>
         <p className="mt-6 text-lg sm:text-xl text-white/80 font-light max-w-md mx-auto">
-          Animated gradients. Self-contained. One price. No subscriptions.
+          Animated gradients for web UIs. Self-hosted. One price.
         </p>
-        <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center items-center">
+        <div className="mt-10 flex flex-col items-center gap-4">
           <Button variant="primary" size="lg" onClick={onCtaClick}>
             Full access — $5
           </Button>
-          <button
-            type="button"
-            onClick={onLicenseKeyClick}
-            className="text-white/60 hover:text-white text-sm underline underline-offset-2 transition-colors"
-          >
-            Already have a key?
-          </button>
+          <div className="flex flex-row items-center gap-6 text-sm">
+            <button
+              type="button"
+              onClick={onLicenseKeyClick}
+              className="text-white/60 hover:text-white underline underline-offset-2 transition-colors"
+            >
+              Already have a key?
+            </button>
+            <Link
+              href="/docs"
+              className="text-white/60 hover:text-white underline underline-offset-2 transition-colors"
+            >
+              Documentation
+            </Link>
+          </div>
         </div>
       </div>
     </section>

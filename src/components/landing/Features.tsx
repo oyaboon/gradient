@@ -2,9 +2,9 @@
 
 const FEATURES = [
   { id: "01", title: "INSTANT", desc: "Runs in the browser. No loading spinners, no CDN." },
-  { id: "02", title: "SELF-HOSTED", desc: "Export HTML + JS. Host anywhere. No dependency on us." },
-  { id: "03", title: "ONE-TIME", desc: "$5 once. No recurring fees, no seat counts." },
-  { id: "04", title: "NO BULLSHIT", desc: "Just the generator, presets, and export. Nothing else." },
+  { id: "02", title: "SELF-HOSTED", desc: "Drop it into any project. Tweak it fast." },
+  { id: "03", title: "$5 ONCE", desc: "Full generator access. No recurring fees, no seat counts." },
+  { id: "04", title: "OPEN SOURCE", desc: "Runtime is MIT-licensed. Or wire it up yourself." },
 ];
 
 export function Features() {
