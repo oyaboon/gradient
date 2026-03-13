@@ -15,9 +15,23 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "gradient — Animated gradient generator",
+  metadataBase: new URL("https://gradient.oyaboon.com"),
+  title: "gradient — Animated gradients for web UIs",
   description:
-    "Self-contained animated gradients. One-time purchase. Export HTML, ZIP, or PNG. No CDN, no subscriptions.",
+    "Animated gradients for web UIs. Self-hosted. One price. Export for code or design.",
+  icons: {
+    icon: "/favicon.svg",
+    apple: "/apple-touch-icon.png",
+  },
+  manifest: "/manifest.json",
+  openGraph: {
+    siteName: "gradient",
+    images: "/og-image.png",
+  },
+  twitter: {
+    card: "summary_large_image",
+    images: "https://gradient.oyaboon.com/og-image.png",
+  },
 };
 
 export default function RootLayout({
