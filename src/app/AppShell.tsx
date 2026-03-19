@@ -17,9 +17,6 @@ interface PaddleCheckoutEvent {
 declare global {
   interface Window {
     Paddle?: {
-      Environment: {
-        set: (environment: "sandbox") => void;
-      };
       Initialize: (options: {
         token: string;
         eventCallback?: (event: PaddleCheckoutEvent) => void;
@@ -32,7 +29,6 @@ declare global {
             displayMode?: "overlay" | "inline";
             variant?: "multi-page" | "one-page";
             theme?: "light" | "dark";
-            successUrl?: string;
           };
         }) => void;
       };
@@ -49,7 +45,6 @@ export function AppShell() {
   const toastMessage = useToastStore((s) => s.message);
   const dismissToast = useToastStore((s) => s.dismiss);
   const paddleClientToken = process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN;
-  const paddleEnvironment = process.env.NEXT_PUBLIC_PADDLE_ENV;
 
   useEffect(() => setMounted(true), []);
 
@@ -68,10 +63,6 @@ export function AppShell() {
       return;
     }
 
-    if (paddleEnvironment === "sandbox") {
-      window.Paddle.Environment.set("sandbox");
-    }
-
     window.Paddle.Initialize({
       token: paddleClientToken,
       eventCallback: (event) => {
@@ -81,7 +72,7 @@ export function AppShell() {
       },
     });
     window.__gradientPaddleInitialized = true;
-  }, [paddleClientToken, paddleEnvironment, paddleScriptLoaded]);
+  }, [paddleClientToken, paddleScriptLoaded]);
 
   const handlePurchaseClick = useCallback(() => {
     const priceId = process.env.NEXT_PUBLIC_PADDLE_PRICE_ID;
