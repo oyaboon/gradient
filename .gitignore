@@ -28,10 +28,16 @@ yarn-error.log*
 *.swp
 *.swo
 documents/
+google34507de3c9461880.html
 
 # OS
 .DS_Store
 Thumbs.db
+
+# Prisma
+prisma/dev.db
+prisma/dev.db-journal
+src/generated
 
 # Vercel
 .vercel

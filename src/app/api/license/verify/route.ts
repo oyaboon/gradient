@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
+import { prismaClient } from "@/lib/prisma";
 
 export type VerifyRequest = { license_key: string };
 export type VerifyResponse = {
   is_valid: boolean;
   license_status: string;
 };
+
+export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   try {
@@ -18,29 +21,43 @@ export async function POST(request: Request) {
       );
     }
 
-    // Placeholder: Stripe (or other provider) verification will be wired here.
-    // For MVP, accept a known test key for development.
-    const STRIPE_LICENSE_CHECK = process.env.STRIPE_SECRET_KEY;
-    const isTestKey = license_key === "gradient-mvp-test-key";
-
-    if (isTestKey) {
+    if (license_key === "gradient-mvp-test-key") {
       return NextResponse.json<VerifyResponse>({
         is_valid: true,
         license_status: "active",
       });
     }
 
-    if (!STRIPE_LICENSE_CHECK) {
+    const licenseRecord = await prismaClient.license.findUnique({
+      where: {
+        licenseKey: license_key,
+      },
+    });
+
+    if (!licenseRecord) {
       return NextResponse.json<VerifyResponse>({
         is_valid: false,
         license_status: "invalid",
       });
     }
 
-    // TODO: call Stripe (or license service) to validate license_key
+    if (licenseRecord.status === "refunded") {
+      return NextResponse.json<VerifyResponse>({
+        is_valid: false,
+        license_status: "refunded",
+      });
+    }
+
+    if (licenseRecord.status === "revoked") {
+      return NextResponse.json<VerifyResponse>({
+        is_valid: false,
+        license_status: "invalid",
+      });
+    }
+
     return NextResponse.json<VerifyResponse>({
-      is_valid: false,
-      license_status: "invalid",
+      is_valid: true,
+      license_status: "active",
     });
   } catch {
     return NextResponse.json<VerifyResponse>(

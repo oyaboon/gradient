@@ -1,0 +1,28 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model License {
+  id                      String   @id @default(cuid())
+  licenseKey              String   @unique
+  status                  String   @default("active")
+  customerEmail           String?
+  paymentProvider         String?  // "paddle" | "stripe" (legacy)
+  transactionId           String?  @unique // Paddle txn_xxx; used for lookup after checkout
+  stripeCheckoutSessionId String?  @unique // legacy Stripe
+  stripePaymentIntentId   String?  @unique
+  stripeCustomerId        String?
+  stripeRefundId          String?
+  refundId                String?  // Paddle adjustment id for refunds
+  amountInCents           Int
+  currencyCode            String
+  productCode             String
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+  refundedAt              DateTime?
+}
