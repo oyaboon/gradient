@@ -1,7 +1,17 @@
 {
   "name": "gradient-runtime",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Standalone gradient animation runtime for the browser",
+  "author": "oyaboon",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oyaboon/gradient.git",
+    "directory": "packages/gradient-runtime"
+  },
+  "homepage": "https://gradient.oyaboon.com",
+  "bugs": {
+    "url": "https://github.com/oyaboon/gradient/issues"
+  },
   "type": "module",
   "main": "./dist/gradient-runtime.esm.js",
   "module": "./dist/gradient-runtime.esm.js",

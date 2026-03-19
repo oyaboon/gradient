@@ -29,6 +29,7 @@ yarn-error.log*
 *.swo
 documents/
 google34507de3c9461880.html
+scripts/
 
 # OS
 .DS_Store

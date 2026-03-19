@@ -21,13 +21,6 @@ export async function POST(request: Request) {
       );
     }
 
-    if (license_key === "gradient-mvp-test-key") {
-      return NextResponse.json<VerifyResponse>({
-        is_valid: true,
-        license_status: "active",
-      });
-    }
-
     const licenseRecord = await prismaClient.license.findUnique({
       where: {
         licenseKey: license_key,

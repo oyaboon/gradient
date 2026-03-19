@@ -7,7 +7,7 @@ In Vercel project **Settings > Environment variables** set:
 | Variable | Description |
 |----------|-------------|
 | `PADDLE_API_KEY` | Server API key from Paddle > Developer tools > Authentication (use live key for production). |
-| `PADDLE_PRICE_ID` | Price ID (e.g. `pri_01km0h8kk3saqh4cp6pdj29gwh`) from Product > Price in Paddle. |
+| `PADDLE_PRICE_ID` | Price ID (e.g. `pri_...`) from Product > Price in Paddle. |
 | `PADDLE_WEBHOOK_SECRET` | Endpoint secret from Paddle > Developer tools > Notifications > your webhook destination. |
 | `APP_URL` | Your app URL (e.g. `https://your-app.vercel.app`). |
 | `DATABASE_URL` | Already set if Neon is connected in Vercel Storage. |

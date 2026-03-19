@@ -1,6 +1,24 @@
-# gradient-runtime
+<p align="center">
+  <img src="https://gradient.oyaboon.com/og-image.png" alt="gradient" width="800" />
+</p>
 
-Standalone gradient animation runtime for the browser. Works with vanilla JS, React, Next.js, or any UI (e.g. shadcn/ui).
+<h1 align="center">gradient-runtime</h1>
+
+<p align="center">Standalone gradient animation runtime for the browser. Works with vanilla JS, React, Next.js, or any UI (e.g. shadcn/ui).</p>
+
+<p align="center">
+  <a href="https://www.npmjs.com/package/gradient-runtime"><img src="https://img.shields.io/npm/v/gradient-runtime.svg" alt="npm version" /></a>
+  <a href="https://github.com/oyaboon/gradient/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License" /></a>
+</p>
+
+<p align="center">
+  <a href="https://gradient.oyaboon.com">Website &amp; generator</a> ·
+  <a href="https://gradient.oyaboon.com/docs">Docs</a> ·
+  <a href="https://github.com/oyaboon/gradient">GitHub</a> ·
+  <a href="https://x.com/oyaboonx">X</a>
+</p>
+
+---
 
 ## Install
 
@@ -70,3 +88,19 @@ import { Gradient, mountGradient, mountSharedGradient } from "gradient-runtime";
   window.Gradient.mount("#target", preset, options);
 </script>
 ```
+
+---
+
+## Links
+
+| Resource | URL |
+|----------|-----|
+| Generator | [gradient.oyaboon.com](https://gradient.oyaboon.com) |
+| Documentation | [gradient.oyaboon.com/docs](https://gradient.oyaboon.com/docs) |
+| Source (monorepo) | [github.com/oyaboon/gradient](https://github.com/oyaboon/gradient) |
+| Issues | [github.com/oyaboon/gradient/issues](https://github.com/oyaboon/gradient/issues) |
+| X | [@oyaboonx](https://x.com/oyaboonx) |
+
+## License
+
+MIT — see [LICENSE](https://github.com/oyaboon/gradient/blob/main/LICENSE).
